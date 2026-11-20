@@ -53,8 +53,8 @@ h1,h2,h3{margin:0}
 /* top bar */
 .top{display:flex;align-items:center;gap:8px;padding:4px 10px 8px}
 .ib{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.08);font-size:20px;flex:none}
-.stat{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
-.stat span{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:6px 10px;font-size:13px;color:#ead7c6;white-space:nowrap}
+.stat{flex:1;display:flex;justify-content:center;gap:4px;flex-wrap:wrap;min-width:0}
+.stat span{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:6px 8px;font-size:12.5px;color:#ead7c6;white-space:nowrap}
 .stat b{color:#ffe1a6}
 .tokens{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:10px 12px}
 .tk{font-size:12.5px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#ead7c6}
@@ -191,16 +191,20 @@ table.ref .cname{font-weight:700;white-space:nowrap}
 .tag{font-size:11px;font-weight:400;background:#6b2335;color:#fff;border-radius:6px;padding:1px 6px;margin-left:4px}
 .ostat{display:flex;justify-content:center;align-items:center;gap:8px;margin:0 14px;font-size:14px;color:#e2c9b3}
 .ostat b{color:#ffe1a6}
-.lastlog{display:block;width:calc(100% - 28px);margin:4px 14px 0;font-size:12.5px;color:#cdb8a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
-.tablewrap{position:relative;height:44vh;min-height:300px;max-height:420px;margin:2px 6px}
+.lastlog{display:block;width:calc(100% - 28px);margin:2px 14px 0;font-size:12.5px;color:#cdb8a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.tablewrap{position:relative;height:46vh;min-height:330px;max-height:440px;margin:6px 6px 2px}
+.pile{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;padding:6px;cursor:pointer}
+.pile i{font-style:normal;width:20px;height:27px;border-radius:3px;background:#fffaf0;border:2px solid var(--c);color:var(--c);font-size:12px;font-weight:800;display:grid;place-items:center;margin-left:-12px;box-shadow:-2px 1px 4px rgba(0,0,0,.45)}
+.pile i:first-of-type{margin-left:0}
+.pile .more{font-size:10px;color:#f3e2cf;margin-right:3px}
 .felt{position:absolute;inset:13% 11%;border-radius:50%;background:radial-gradient(circle,#6b2335 0%,#47152a 70%,#36101f 100%);border:3px solid rgba(212,173,85,.55);box-shadow:inset 0 0 30px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.4)}
 .deck{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:#ffe9d2;cursor:pointer}
-.deck .stack{position:relative;width:46px;height:64px}
+.deck .stack{position:relative;width:38px;height:53px}
 .deck .stack i{position:absolute;inset:0;border-radius:6px;background:repeating-linear-gradient(45deg,#7a2a3e 0 6px,#5e1d2f 6px 12px);border:2px solid var(--gold)}
 .deck .stack i:nth-child(2){transform:translate(3px,-3px)}
 .deck .stack i:nth-child(3){transform:translate(6px,-6px)}
 .deck b{color:#ffe1a6;font-size:15px}
-.seat{position:absolute;transform:translate(-50%,-50%);width:94px;text-align:center;font-size:12px;color:#f3e2cf}
+.seat{position:absolute;transform:translate(-50%,-50%);width:86px;text-align:center;font-size:12px;color:#f3e2cf}
 .sname{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 6px;border-radius:999px;background:rgba(0,0,0,.5)}
 .seat.cur .sname{background:var(--gold);color:#2b1a0c}
 .seat.out{opacity:.45}
@@ -208,6 +212,7 @@ table.ref .cname{font-weight:700;white-space:nowrap}
 .mb{width:28px;height:39px;border-radius:4px;background:repeating-linear-gradient(45deg,#7a2a3e 0 4px,#5e1d2f 4px 8px);border:1.5px solid var(--gold);box-shadow:0 2px 4px rgba(0,0,0,.4)}
 .seat.cur .mb{box-shadow:0 0 0 2px #ffe1a6,0 0 12px rgba(255,225,166,.6)}
 .sbacks em{font-style:normal;font-size:11px;color:#ffb3c0}
+.sbacks em.stk{color:#ff9fb1;font-size:11.5px;margin-left:3px;align-self:flex-end}
 .smemo{display:flex;gap:2px;justify-content:center;flex-wrap:wrap}
 .smemo span{font-size:10.5px;padding:1px 5px;border-radius:6px;background:#ffe1a6;color:#2b1a0c}
 .smemo span.x{background:rgba(255,255,255,.22);color:#f3e2cf}
@@ -226,8 +231,8 @@ table.ref .cname{font-weight:700;white-space:nowrap}
 .zoomwrap .card .ci{font-size:64px}
 .zoomwrap .card .cn{font-size:26px}
 .zoomwrap .card .cv{font-size:40px}
-.mopts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.mo{padding:7px 4px;border-radius:10px;border:2px solid var(--c);background:#fffaf0;color:var(--ink);font-size:13px;font-weight:700}
+.mopts{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.mo{padding:10px 0;border-radius:8px;border:2px solid var(--c);background:#fffaf0;color:var(--c);font-size:18px;font-weight:800;min-width:0}
 .mo small{display:block;font-size:16px;color:var(--c)}
 .mo.on{background:var(--c);color:#fff}.mo.on small{color:#fff}
 .dgrid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
@@ -1076,27 +1081,27 @@ function renderTable(){
   if(G.screen==='roundEnd')return head+renderRoundEnd();
   if(G.screen==='gameEnd')return renderGameEnd();
   const base=me<0?0:me,startK=me<0?0:1;
-  let seats='';
+  let seats='',piles='';
+  if(me>=0)piles+=pileHTML(me,50,50+33*0.52);
   for(let k=startK;k<N;k++){
     const j=(base+k)%N,p=G.players[j];
-    const th=(90+360*k/N)*Math.PI/180,x=50+40*Math.cos(th),y=50+39*Math.sin(th);
+    const th=(90+360*k/N)*Math.PI/180,x=50+40*Math.cos(th),y=50+33*Math.sin(th);
+    piles+=pileHTML(j,50+40*0.47*Math.cos(th),50+33*0.52*Math.sin(th));
     const out=!R.alive[j],m=memoOf(p.pid);
     const backs=out?'<em>탈락</em>':R.hands[j].map(()=>'<i class="mb"></i>').join('');
     const memo=(m.guess?`<span>예상 ${TYPES[m.guess].name}</span>`:'')+(m.ex.length?`<span class="x">제외 ${m.ex.length}</span>`:'');
-    const ds=R.discards[j],tail=ds.slice(-5);
     seats+=`<div class="seat ${j===G.cur?'cur':''} ${out?'out':''}" style="left:${x}%;top:${y}%">
       <div class="sname">${isOn(j)?'':'📴 '}${esc(p.name)}${R.prot[j]?' 🌸':''}</div>
-      <div class="sbacks" data-a="omemo" data-v="${j}">${backs}</div>
+      <div class="sbacks" data-a="omemo" data-v="${j}">${backs}<em class="stk">♥${p.tokens}</em></div>
       ${memo?`<div class="smemo">${memo}</div>`:''}
-      <div class="sdisc" data-a="odisc" data-v="${j}">${ds.length>5?`<i style="--c:#555">+${ds.length-5}</i>`:''}${tail.map(t=>`<i style="--c:${TYPES[t].color}">${V(t)}</i>`).join('')}</div>
-      <div class="stok">♥${p.tokens}</div></div>`;
+      </div>`;
   }
   const lastLog=R.log.length?safe(R.log[R.log.length-1]):'';
   const table=`<div class="ostat">${G.cur===me?'<b>내 차례</b>':`<span><b>${curName}</b>의 차례</span>`}</div>
   <button class="lastlog" data-a="olog">${lastLog}</button>
   <div class="tablewrap"><div class="felt"></div>
     <div class="deck" data-a="info"><div class="stack"><i></i><i></i><i></i></div><span>덱 <b>${R.deck.length}</b>장</span></div>
-    ${seats}${me>=0?`<div class="memark" style="top:93%">나 · ♥${G.players[me].tokens}</div>`:''}</div>`;
+    ${piles}${seats}${me>=0?`<div class="memark" style="top:94%">나 · ♥${G.players[me].tokens}</div>`:''}</div>`;
   let low='';
   if(me<0)low='<p class="hint">이미 시작된 게임이라 관전 중이에요.</p>';
   else if(G.cur===me&&G.screen==='turn'&&(R.alive[me]||G.step==='result')){
@@ -1109,6 +1114,11 @@ function renderTable(){
       :'<div class="dead">이번 라운드에서 탈락했습니다.</div>');
   }
   return head+table+`<div class="mine ${O.pending?'busy':''}">${low}</div>`;
+}
+function pileHTML(j,x,y){
+  const ds=G.R.discards[j];if(!ds.length)return '';
+  const tail=ds.slice(-6);
+  return `<div class="pile" data-a="odisc" data-v="${j}" style="left:${x}%;top:${y}%">${ds.length>6?`<span class="more">+${ds.length-6}</span>`:''}${tail.map(t=>`<i style="--c:${TYPES[t].color}">${V(t)}</i>`).join('')}</div>`;
 }
 function renderOnline(){
   if(O.phase==='menu')return renderOnlineMenu();
@@ -1169,9 +1179,9 @@ function renderSheet(){
       const m=memoOf(p.pid),types=Object.keys(ED().counts);
       c=`<h2>${esc(p.name)} <small style="font-size:13px;color:var(--muted)">${!R.alive[j]?'탈락':R.prot[j]?'🌸 보호 중':''}</small></h2>
       <h3>예상 카드 <small style="font-weight:400;color:var(--muted)">(하나만)</small></h3>
-      <div class="mopts">${types.map(t=>`<button class="mo ${m.guess===t?'on':''}" style="--c:${TYPES[t].color}" data-a="mguess" data-v="${t}"><small>${V(t)}</small>${TYPES[t].name}</button>`).join('')}</div>
+      <div class="mopts" style="grid-template-columns:repeat(${types.length},1fr)">${types.map(t=>`<button class="mo ${m.guess===t?'on':''}" style="--c:${TYPES[t].color}" data-a="mguess" data-v="${t}" aria-label="${TYPES[t].name}">${V(t)}</button>`).join('')}</div>
       <h3>제외 카드 <small style="font-weight:400;color:var(--muted)">(여러 개)</small></h3>
-      <div class="mopts">${types.map(t=>`<button class="mo ${m.ex.includes(t)?'on':''}" style="--c:${TYPES[t].color}" data-a="mex" data-v="${t}"><small>${V(t)}</small>${TYPES[t].name}</button>`).join('')}</div>
+      <div class="mopts" style="grid-template-columns:repeat(${types.length},1fr)">${types.map(t=>`<button class="mo ${m.ex.includes(t)?'on':''}" style="--c:${TYPES[t].color}" data-a="mex" data-v="${t}" aria-label="${TYPES[t].name}">${V(t)}</button>`).join('')}</div>
       <p class="hint" style="color:var(--muted)">메모는 내 휴대폰에만 보이고, 라운드가 바뀌면 지워져요.</p>
       <button class="btn ghost" style="color:var(--ink);border-color:var(--line)" data-a="mclear">메모 지우기</button>
       <h3>버린 카드</h3>${R.discards[j].length?`<div class="dgrid">${R.discards[j].map(t=>cardHTML(t,{cls:'sm',attr:`data-a="zoomc" data-v="${t}"`})).join('')}</div>`:'<p class="hint" style="color:var(--muted)">아직 없음</p>'}`;
