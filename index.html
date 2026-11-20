@@ -233,10 +233,16 @@ table.ref .cname{font-weight:700;white-space:nowrap}
 .zoomwrap .card .cv{font-size:40px}
 .mopts{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
 .mo{padding:10px 0;border-radius:8px;border:2px solid var(--c);background:#fffaf0;color:var(--c);font-size:18px;font-weight:800;min-width:0}
-.mo small{display:block;font-size:16px;color:var(--c)}
+
 .mo.on{background:var(--c);color:#fff}.mo.on small{color:#fff}
 .dgrid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .dgrid .card{flex:0 0 30%;max-width:none}
+.dcell{flex:0 0 30%;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
+.dcell .card{width:100%;flex:none}
+.dno{position:absolute;top:-6px;right:-4px;z-index:2;width:20px;height:20px;border-radius:50%;background:#6b2335;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.dnote{font-size:11.5px;line-height:1.35;color:#5a4636;text-align:center;word-break:keep-all;background:#fffaf0;border:1px solid var(--line);border-radius:8px;padding:4px 6px;width:100%}
+.mo small{display:block;font-size:9.5px;line-height:1.15;margin-top:3px;font-weight:700;letter-spacing:-.5px;color:inherit;white-space:nowrap}
+.rp{font-size:13.5px;line-height:1.65;margin:0 0 6px;color:var(--ink)}
 .warn2{background:#fbe7ea;border:1px solid #e9a9b6;color:#8e1f36;font-size:13px;border-radius:10px;padding:8px 12px;margin:8px 0;text-align:center}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -341,7 +347,7 @@ function newRound(){
   const hands=G.players.map(()=>[deck.shift()]);
   G.roundNo++;
   G.R={deck,setAside,faceUp,hands,discards:G.players.map(()=>[]),alive:G.players.map(()=>true),
-       prot:G.players.map(()=>false),notes:G.players.map(()=>[]),log:[],seen:G.players.map(()=>0)};
+       prot:G.players.map(()=>false),notes:G.players.map(()=>[]),log:[],seen:G.players.map(()=>0),dnotes:G.players.map(()=>[])};
   G.cur=G.starter;G.step=null;G.T=null;G.resume=false;G.last=null;G.champs=null;
   addLog(`라운드 ${G.roundNo} 시작 — ${nm(G.cur)}부터 시계 방향`);
   if(G.mode==='online')startTurn();
@@ -352,7 +358,11 @@ function newRound(){
 }
 function addLog(s){G.R.log.push(s)}
 function note(j,s){if(j!==G.cur&&G.R.alive[j])G.R.notes[j].push(s)}
-function eliminate(j){const R=G.R;R.alive[j]=false;R.discards[j].push(...R.hands[j]);R.hands[j]=[];R.prot[j]=false}
+/* 버린 카드마다 '어떻게 버려졌는지' 기록 */
+function dn(j){const R=G.R;if(!R.dnotes)R.dnotes=R.discards.map(d=>d.map(()=>''));while(R.dnotes[j].length<R.discards[j].length)R.dnotes[j].push('');return R.dnotes[j]}
+function dpush(j,c,why){dn(j);G.R.discards[j].push(c);G.R.dnotes[j].push(why||'')}
+function dset(j,why){const a=dn(j);if(a.length)a[a.length-1]=why}
+function eliminate(j,why){const R=G.R;R.alive[j]=false;R.hands[j].forEach(c=>dpush(j,c,why||'탈락하며 공개'));R.hands[j]=[];R.prot[j]=false}
 const aliveList=()=>G.players.map((_,j)=>j).filter(j=>G.R.alive[j]);
 function nextAlive(i){const n=G.players.length;for(let k=1;k<=n;k++){const j=(i+k)%n;if(G.R.alive[j])return j}return i}
 function validTargets(c){
@@ -367,7 +377,7 @@ const isForced=h=>h.includes('countess')&&(h.includes('king')||h.includes('princ
 const IMMEDIATE=['princess','handmaid','countess','spy','chancellor'];
 function playCard(k){
   const R=G.R,i=G.cur,c=R.hands[i].splice(k,1)[0];
-  R.discards[i].push(c);
+  dpush(i,c,'');
   G.T={card:c,k,reveal:[],msg:''};
   if(G.mode==='local'&&IMMEDIATE.includes(c)){G.step='confirm';return}
   applyEffect();
@@ -377,7 +387,7 @@ function undoStep(){
   if(G.step==='guess'){G.step='target';G.T.target=null;return true}
   if(G.step==='target'||G.step==='confirm'){
     const R=G.R,i=G.cur,c=G.T.card,d=R.discards[i];
-    if(d[d.length-1]===c)d.pop();
+    if(d[d.length-1]===c){d.pop();dn(i).pop()}
     const h=R.hands[i];h.splice(Math.min(G.T.k==null?h.length:G.T.k,h.length),0,c);
     G.T=null;G.step='choose';UI.sel=null;return true;
   }
@@ -388,25 +398,25 @@ function applyEffect(){
   const R=G.R,i=G.cur,T=G.T,c=T.card;
   switch(c){
     case 'princess':
-      eliminate(i);T.msg='공주를 내서 <b>탈락</b>했습니다.';
+      dset(i,'직접 냄 → 탈락');eliminate(i,'공주를 내서 탈락하며 공개');T.msg='공주를 내서 <b>탈락</b>했습니다.';
       addLog(`${P(i,'이','가')} 공주를 내고 <b>탈락</b>했습니다.`);return toResult();
     case 'handmaid':
-      R.prot[i]=true;T.msg='내 다음 차례까지 보호받습니다.';
+      R.prot[i]=true;dset(i,'다음 차례까지 보호');T.msg='내 다음 차례까지 보호받습니다.';
       addLog(`${P(i,'이','가')} 시녀를 냈습니다. (다음 차례까지 보호)`);return toResult();
     case 'countess':
-      T.msg='백작부인을 냈습니다. (효과 없음)';
+      dset(i,'냄 (효과 없음)');T.msg='백작부인을 냈습니다. (효과 없음)';
       addLog(`${P(i,'이','가')} 백작부인을 냈습니다.`);return toResult();
     case 'spy':
-      T.msg='스파이를 냈습니다. (라운드 종료 시 보너스 확인)';
+      dset(i,'냄 (라운드 끝에 보너스 확인)');T.msg='스파이를 냈습니다. (라운드 종료 시 보너스 확인)';
       addLog(`${P(i,'이','가')} 스파이를 냈습니다.`);return toResult();
     case 'chancellor':{
       const d=Math.min(2,R.deck.length);
-      if(!d){T.msg='덱이 비어 있어 효과가 없습니다.';addLog(`${P(i,'이','가')} 대신을 냈지만 덱이 비어 효과가 없었습니다.`);return toResult()}
+      if(!d){dset(i,'덱이 비어 효과 없음');T.msg='덱이 비어 있어 효과가 없습니다.';addLog(`${P(i,'이','가')} 대신을 냈지만 덱이 비어 효과가 없었습니다.`);return toResult()}
       T.drawn=d;R.hands[i].push(...R.deck.splice(0,d));G.step='chKeep';return;
     }
     default:{
       if(!validTargets(c).length){
-        T.msg='고를 수 있는 대상이 없어(모두 보호 중) 효과 없이 버려졌습니다.';
+        dset(i,'대상이 없어 효과 없음');T.msg='고를 수 있는 대상이 없어(모두 보호 중) 효과 없이 버려졌습니다.';
         addLog(`${P(i,'이','가')} ${C(c,'을','를')} 냈지만 대상이 없어 효과가 없었습니다.`);return toResult();
       }
       G.step='target';
@@ -419,27 +429,29 @@ function chooseTarget(j){
   const R=G.R,i=G.cur;
   if(T.card==='priest'){
     T.reveal=[{label:`${nm(j)}의 카드`,card:R.hands[j][0]}];
-    T.msg=`${P(j,'의','의')} 카드를 몰래 확인했습니다.`;learn(i,j,R.hands[j][0]);
+    T.msg=`${P(j,'의','의')} 카드를 몰래 확인했습니다.`;learn(i,j,R.hands[j][0]);dset(i,`${nm(j)}의 카드 확인`);
     addLog(`${P(i,'이','가')} 사제로 ${P(j,'의','의')} 카드를 봤습니다.`);
     note(j,`${P(i,'이','가')} 사제로 내 카드를 봤습니다.`);
   }else if(T.card==='baron'){
     const mine=R.hands[i][0],theirs=R.hands[j][0];
     T.reveal=[{label:'내 카드',card:mine},{label:`${nm(j)}의 카드`,card:theirs}];
     if(V(mine)===V(theirs)){
-      T.msg='숫자가 같아 아무도 탈락하지 않았습니다.';learn(i,j,theirs);learn(j,i,mine);
+      T.msg='숫자가 같아 아무도 탈락하지 않았습니다.';learn(i,j,theirs);learn(j,i,mine);dset(i,`${P(j,'와','과')} 비교 → 비김`);
       addLog(`${P(i,'이','가')} 남작으로 ${P(j,'와','과')} 비교 — 비김`);
       note(j,`${P(i,'이','가')} 남작으로 비교했습니다. 상대 카드도 ${C(theirs,'이었','였')}습니다 → 비김`);
     }else{
       const lose=V(mine)<V(theirs)?i:j, lc=lose===i?mine:theirs;
-      eliminate(lose);
+      dset(i,`${P(j,'와','과')} 비교 → ${lose===i?'져서 탈락':nm(j)+' 탈락'}`);
+      eliminate(lose,lose===i?`${P(j,'와','과')} 남작 비교에서 져서 탈락`:`${P(i,'의','의')} 남작 비교에서 져서 탈락`);
       T.msg=lose===i?'내 카드가 낮아 <b>탈락</b>했습니다.':`<b>${nm(j)} 탈락!</b>`;
       addLog(`${P(i,'이','가')} 남작으로 ${P(j,'와','과')} 비교 — <b>${nm(lose)} 탈락</b> (버린 카드: ${TYPES[lc].name})`);
       if(lose===i)note(j,`${P(i,'이','가')} 남작으로 비교했다가 졌습니다. 상대 카드: ${TYPES[mine].name}`);
     }
   }else if(T.card==='prince'){
-    const d=R.hands[j].shift();R.discards[j].push(d);
+    dset(i,j===i?'자신을 지목':`${nm(j)} 지목`);
+    const d=R.hands[j].shift();dpush(j,d,j===i?'내 왕자로 버림':`${P(i,'의','의')} 왕자로 지목되어 버림`);
     if(d==='princess'){
-      eliminate(j);
+      dset(j,(j===i?'내 왕자로 버림':`${P(i,'의','의')} 왕자로 지목되어 버림`)+' → 탈락');eliminate(j);
       T.msg=`${j===i?'내가':P(j,'이','가')} 공주를 버려서 <b>탈락</b>했습니다.`;
       addLog(`${P(i,'이','가')} 왕자로 ${j===i?'자신':nm(j)}의 카드를 버리게 함 — 공주! <b>${nm(j)} 탈락</b>`);
     }else{
@@ -452,7 +464,7 @@ function chooseTarget(j){
     }
   }else if(T.card==='king'){
     const a=R.hands[i][0],b=R.hands[j][0];
-    R.hands[i]=[b];R.hands[j]=[a];learn(i,j,a);learn(j,i,b);
+    R.hands[i]=[b];R.hands[j]=[a];learn(i,j,a);learn(j,i,b);dset(i,`${P(j,'와','과')} 카드 교환`);
     T.msg=`${P(j,'와','과')} 카드를 맞바꿨습니다.`;
     T.reveal=[{label:'넘겨준 카드',card:a},{label:'받은 카드',card:b}];
     addLog(`${P(i,'이','가')} 왕으로 ${P(j,'와','과')} 카드를 맞바꿨습니다.`);
@@ -462,8 +474,9 @@ function chooseTarget(j){
 }
 function resolveGuard(g){
   const R=G.R,i=G.cur,j=G.T.target,T=G.T,gn=TYPES[g].name;
+  dset(i,`${nm(j)} 지목, '${gn}' 추측 → ${R.hands[j][0]===g?'적중':'빗나감'}`);
   if(R.hands[j][0]===g){
-    eliminate(j);
+    eliminate(j,`${P(i,'의','의')} 경비병에 맞아 탈락`);
     T.msg=`적중! ${P(j,'의','의')} 카드는 ${gn}. <b>${nm(j)} 탈락!</b>`;
     addLog(`${P(i,'이','가')} 경비병으로 ${P(j,'을','를')} 지목, '${gn}' 추측 — 적중! <b>${nm(j)} 탈락</b>`);
   }else{
@@ -481,6 +494,7 @@ function chancellorKeep(k){
 function chancellorBottom(k){const R=G.R,rest=G.T.rest;R.deck.push(rest[1-k],rest[k]);G.T.rest=null;finishCh(2)}
 function finishCh(n){
   const i=G.cur;
+  dset(i,`${G.T.drawn}장 뽑고 ${n}장을 덱 아래로`);
   G.T.msg=`카드 ${n}장을 덱 맨 아래에 놓았습니다.`;
   addLog(`${P(i,'이','가')} 대신을 냈습니다. (${G.T.drawn}장 뽑고 ${n}장을 덱 아래로)`);
   toResult();
@@ -714,6 +728,7 @@ function renderModeSelect(){
   return `<div class="hero"><div class="seal">💌</div><h1 class="serif">러브레터</h1></div>
   <button class="mode" data-a="mode" data-v="local"><span class="mi">📱</span><b>휴대폰 1대 모드</b><small>한 대를 돌려 가며 플레이</small></button>
   <button class="mode" data-a="mode" data-v="online"><span class="mi">📱📱</span><b>각자 휴대폰 모드</b><small>QR 코드로 방에 들어와 각자 플레이</small></button>
+  <button class="btn ghost" data-a="grules">게임 규칙 보기</button>
   <button class="btn ghost" data-a="rules">카드 설명 보기</button>`;
 }
 function renderSetup(){
@@ -976,6 +991,7 @@ function sanitizeState(st){
     st.roundNo=+st.roundNo||0;st.target=+st.target||0;st.cur=+st.cur||0;st.starter=+st.starter||0;
     if(!Array.isArray(R.log))R.log=[];
     if(!Array.isArray(R.notes))R.notes=st.players.map(()=>[]);
+    R.dnotes=Array.isArray(R.dnotes)?R.dnotes.map(a=>Array.isArray(a)?a.map(x=>String(x).slice(0,120)):[]):st.players.map(()=>[]);
     if(st.T){if(!TYPES[st.T.card])st.T=null;else{st.T.target=st.T.target==null?null:+st.T.target;st.T.reveal=(st.T.reveal||[]).filter(r=>TYPES[r.card]);if(st.T.rest&&!st.T.rest.every(t=>TYPES[t]))st.T.rest=null}}
     if(st.last){st.last.winners=(st.last.winners||[]).map(Number);st.last.alive=(st.last.alive||[]).map(Number);st.last.spy=st.last.spy==null?null:+st.last.spy}
     if(st.champs)st.champs=st.champs.map(Number);
@@ -1135,6 +1151,30 @@ function refTable(){
   ${Object.keys(ed.counts).map(t=>`<tr><td class="cname">${chip(t)}</td><td class="n">${ed.counts[t]}</td>${R?`<td class="n"><b>${ed.counts[t]-(seen[t]||0)}</b></td>`:''}<td>${DESC[t]}</td></tr>`).join('')}</table>
   ${R?'<p class="hint" style="color:var(--muted)">미공개 = 아직 버려지지 않은 카드 (덱·손·따로 뺀 카드)</p>':''}`;
 }
+const moName=t=>{const n=TYPES[t].name;return n.length>=4?n.slice(0,2)+'<br>'+n.slice(2):n};
+function discGrid(j){
+  const R=G.R,ds=R.discards[j],notes=R.dnotes&&R.dnotes[j]||[];
+  if(!ds.length)return '<p class="hint" style="color:var(--muted)">아직 없음</p>';
+  return `<div class="dgrid">${ds.map((t,k)=>`<div class="dcell"><div class="dno">${k+1}</div>${cardHTML(t,{cls:'sm',attr:`data-a="zoomc" data-v="${t}"`})}${notes[k]?`<div class="dnote">${safe(notes[k])}</div>`:''}</div>`).join('')}</div>`;
+}
+function rulesHTML(){
+  const P_=t=>`<p class="rp">${t}</p>`;
+  return `<h2>게임 규칙</h2>
+  <h3>목표</h3>${P_('여러 라운드를 하며 <b>호감 토큰(♥)</b>을 모읍니다. 정해진 개수를 먼저 모으는 사람이 승리합니다.')}
+  <table class="ref"><tr><th>인원</th><th>클래식</th><th>2019 개정판</th></tr>
+  <tr><td>2명</td><td class="n">♥7</td><td class="n">♥6</td></tr><tr><td>3명</td><td class="n">♥5</td><td class="n">♥5</td></tr>
+  <tr><td>4명</td><td class="n">♥4</td><td class="n">♥4</td></tr><tr><td>5~6명</td><td class="n">—</td><td class="n">♥3</td></tr></table>
+  <h3>라운드 준비</h3>${P_('카드를 섞고 <b>1장을 아무도 모르게 따로 뺍니다.</b> 2명이면 3장을 더 빼서 모두에게 공개합니다. 그다음 각자 1장씩 받습니다.')}
+  <h3>내 차례</h3>${P_('① 덱에서 1장을 뽑습니다. → ② 손에 든 2장 중 1장을 골라 앞에 냅니다. → ③ 낸 카드의 능력을 씁니다. 그다음 시계 방향으로 다음 사람 차례입니다.')}
+  ${P_('낸 카드는 모두가 볼 수 있게 내 앞에 쌓아 둡니다. 남은 1장은 계속 손에 들고 있습니다.')}
+  ${P_('능력은 반드시 써야 합니다. 단, 고를 수 있는 상대가 없으면(모두 시녀로 보호 중 등) 효과 없이 버려집니다.')}
+  <h3>탈락</h3>${P_('카드 효과로 탈락하면 손에 든 카드를 공개하고 이번 라운드에서 빠집니다. 다음 라운드에는 다시 참가합니다.')}
+  <h3>라운드 끝</h3>${P_('다음 중 하나가 되면 라운드가 끝납니다.<br>· <b>1명만 남았을 때</b> → 그 사람이 승리<br>· <b>덱이 다 떨어졌을 때</b> (그 차례가 끝난 뒤) → 남은 사람들이 손 카드를 공개하고 <b>숫자가 가장 높은 사람</b>이 승리')}
+  ${P_('숫자가 같으면 지금까지 <b>버린 카드 숫자 합</b>이 큰 사람이 이깁니다. 그것도 같으면 함께 승리합니다.')}
+  ${P_('라운드 승자는 토큰 ♥1개를 받고, <b>다음 라운드는 승자부터</b> 시작합니다.')}
+  <h3>스파이 보너스 (2019 개정판)</h3>${P_('라운드가 끝났을 때 살아남은 사람 중 <b>스파이를 낸(또는 버린) 사람이 나 혼자</b>라면 토큰 ♥1개를 더 받습니다. 라운드 승자가 아니어도 받습니다.')}
+  <h3>이 앱에서만</h3>${P_('· 휴대폰 1대 모드는 라운드마다 <b>카드 확인 시간(0라운드)</b>이 있어 각자 자기 카드를 먼저 봅니다.<br>· 각자 휴대폰 모드에서 다른 사람 뒷면 카드를 누르면 예상·제외 카드를 메모할 수 있습니다.')}`;
+}
 function renderSheet(){
   if(!UI.sheet)return '';
   let c='';
@@ -1143,9 +1183,10 @@ function renderSheet(){
     case 'rules':{
       const ed=ED();
       c=`<h2>카드 설명 · ${ed.label}</h2>${refTable()}
-      <h3>진행</h3><p style="font-size:13px;line-height:1.6;margin:0">덱에서 1장을 비공개로 빼고 각자 1장씩 받습니다. 내 차례에는 1장을 뽑아 2장 중 1장을 내고 능력을 씁니다. 1명만 남거나 덱이 다 떨어지면 라운드 종료 — 남은 사람 중 가장 높은 카드를 든 사람이 토큰을 얻습니다. 동점이면 버린 카드 합이 큰 사람이 이깁니다.</p>`;
+      <p class="hint" style="color:var(--muted)">게임 진행 방법은 메뉴 → 게임 규칙 보기</p>`;
       break;
     }
+    case 'grules':c=rulesHTML();break;
     case 'info':
       if(!R){UI.sheet=null;return ''}
       c=`<h2>게임 정보</h2>
@@ -1159,6 +1200,7 @@ function renderSheet(){
       break;
     case 'menu':
       c=`<h2>메뉴</h2>
+      <button class="btn ghost" style="color:var(--ink);border-color:var(--line)" data-a="grules">게임 규칙 보기</button>
       <button class="btn ghost" style="color:var(--ink);border-color:var(--line)" data-a="rules">카드 설명 보기</button>
       ${MODE==='online'?`<button class="btn rose" data-a="home">방 나가기</button><p class="hint" style="color:var(--muted)">${O.role==='host'?'방장이 나가면 게임이 끝나요. (새로고침은 괜찮아요 — 같은 주소로 다시 열면 이어져요)':'다시 QR을 찍으면 같은 자리로 돌아올 수 있어요.'}</p>`
         :`<button class="btn rose" data-a="home">게임 끝내고 처음으로</button><p class="hint" style="color:var(--muted)">게임을 끝내면 진행 상황이 지워집니다.</p>`}`;
@@ -1179,18 +1221,18 @@ function renderSheet(){
       const m=memoOf(p.pid),types=Object.keys(ED().counts);
       c=`<h2>${esc(p.name)} <small style="font-size:13px;color:var(--muted)">${!R.alive[j]?'탈락':R.prot[j]?'🌸 보호 중':''}</small></h2>
       <h3>예상 카드 <small style="font-weight:400;color:var(--muted)">(하나만)</small></h3>
-      <div class="mopts" style="grid-template-columns:repeat(${types.length},1fr)">${types.map(t=>`<button class="mo ${m.guess===t?'on':''}" style="--c:${TYPES[t].color}" data-a="mguess" data-v="${t}" aria-label="${TYPES[t].name}">${V(t)}</button>`).join('')}</div>
+      <div class="mopts" style="grid-template-columns:repeat(${types.length},1fr)">${types.map(t=>`<button class="mo ${m.guess===t?'on':''}" style="--c:${TYPES[t].color}" data-a="mguess" data-v="${t}" aria-label="${TYPES[t].name}">${V(t)}<small>${moName(t)}</small></button>`).join('')}</div>
       <h3>제외 카드 <small style="font-weight:400;color:var(--muted)">(여러 개)</small></h3>
-      <div class="mopts" style="grid-template-columns:repeat(${types.length},1fr)">${types.map(t=>`<button class="mo ${m.ex.includes(t)?'on':''}" style="--c:${TYPES[t].color}" data-a="mex" data-v="${t}" aria-label="${TYPES[t].name}">${V(t)}</button>`).join('')}</div>
+      <div class="mopts" style="grid-template-columns:repeat(${types.length},1fr)">${types.map(t=>`<button class="mo ${m.ex.includes(t)?'on':''}" style="--c:${TYPES[t].color}" data-a="mex" data-v="${t}" aria-label="${TYPES[t].name}">${V(t)}<small>${moName(t)}</small></button>`).join('')}</div>
       <p class="hint" style="color:var(--muted)">메모는 내 휴대폰에만 보이고, 라운드가 바뀌면 지워져요.</p>
       <button class="btn ghost" style="color:var(--ink);border-color:var(--line)" data-a="mclear">메모 지우기</button>
-      <h3>버린 카드</h3>${R.discards[j].length?`<div class="dgrid">${R.discards[j].map(t=>cardHTML(t,{cls:'sm',attr:`data-a="zoomc" data-v="${t}"`})).join('')}</div>`:'<p class="hint" style="color:var(--muted)">아직 없음</p>'}`;
+      <h3>버린 카드</h3>${discGrid(j)}`;
       break;
     }
     case 'disc':{
       const j=UI.seat,p=G.players[j];if(!p){UI.sheet=null;return ''}
       c=`<h2>${j===O.me?'내':esc(p.name)+'의'} 버린 카드</h2>
-      ${R.discards[j].length?`<div class="dgrid">${R.discards[j].map(t=>cardHTML(t,{cls:'sm',attr:`data-a="zoomc" data-v="${t}"`})).join('')}</div>`:'<p class="hint" style="color:var(--muted)">아직 없음</p>'}`;
+      ${discGrid(j)}`;
       break;
     }
     case 'log':
@@ -1228,6 +1270,7 @@ function act(a,v){
     case 'start':clearSave();startGame();break;
     case 'resume':{const s=load();if(s){G=s;if(!G.mode)G.mode='local';if(G.screen==='turn'){G.resume=true;G.screen='handoff'}if(G.screen==='peek')G.peekShow=false}break}
     case 'rules':UI.sheet='rules';break;
+    case 'grules':UI.sheet='grules';break;
     case 'info':UI.sheet='info';break;
     case 'menu':UI.sheet='menu';break;
     case 'olog':UI.sheet='log';break;
