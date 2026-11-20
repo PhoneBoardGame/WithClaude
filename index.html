@@ -377,7 +377,7 @@ const isForced=h=>h.includes('countess')&&(h.includes('king')||h.includes('princ
 const IMMEDIATE=['princess','handmaid','countess','spy','chancellor'];
 function playCard(k){
   const R=G.R,i=G.cur,c=R.hands[i].splice(k,1)[0];
-  dpush(i,c,'');
+  dpush(i,c,'');if(R.taint)R.taint[i]=false;
   G.T={card:c,k,reveal:[],msg:''};
   if(G.mode==='local'&&IMMEDIATE.includes(c)){G.step='confirm';return}
   applyEffect();
@@ -464,7 +464,7 @@ function chooseTarget(j){
     }
   }else if(T.card==='king'){
     const a=R.hands[i][0],b=R.hands[j][0];
-    R.hands[i]=[b];R.hands[j]=[a];learn(i,j,a);learn(j,i,b);dset(i,`${P(j,'와','과')} 카드 교환`);
+    R.hands[i]=[b];R.hands[j]=[a];learn(i,j,a);learn(j,i,b);(R.taint=R.taint||{})[j]=true;dset(i,`${P(j,'와','과')} 카드 교환`);
     T.msg=`${P(j,'와','과')} 카드를 맞바꿨습니다.`;
     T.reveal=[{label:'넘겨준 카드',card:a},{label:'받은 카드',card:b}];
     addLog(`${P(i,'이','가')} 왕으로 ${P(j,'와','과')} 카드를 맞바꿨습니다.`);
@@ -549,6 +549,7 @@ function botChoosePlay(s){
     if(t==='king'&&o==='princess')sc+=30;
     if(t==='prince'&&o==='princess'&&!validTargets('prince').some(j=>j!==s))sc+=1000;
     if(t==='guard'&&G.players.some((_,j)=>j!==s&&!G.R.prot[j]&&botKnown(s,j)&&botKnown(s,j)!=='guard'))sc-=5;
+    if(t==='guard'&&G.players.some((_,j)=>j!==s&&!G.R.prot[j]&&countessTell(j)))sc-=2;
     if(t==='spy')sc-=1;
     sc+=rnd()*0.6;
     if(sc<bs){bs=sc;best=k}
@@ -561,18 +562,32 @@ function botTarget(s,c){
   if(!others.length)return tg[0];
   const known=others.filter(j=>botKnown(s,j));
   const mine=G.R.hands[s][0];
-  if(c==='guard'){const k=known.filter(j=>botKnown(s,j)!=='guard');if(k.length)return pickR(k)}
+  if(c==='guard'){const k=known.filter(j=>botKnown(s,j)!=='guard');if(k.length)return pickR(k);
+    const tell=others.filter(countessTell);if(tell.length&&rnd()<0.8)return pickR(tell)}
   if(c==='baron'&&mine){const k=known.filter(j=>V(botKnown(s,j))<V(mine));if(k.length)return pickR(k)}
   if(c==='prince'){const k=known.filter(j=>botKnown(s,j)==='princess');if(k.length)return k[0]}
   if(c==='priest'){const u=others.filter(j=>!botKnown(s,j));if(u.length)return botLeader(u)}
   if(c==='king'&&mine){const k=known.filter(j=>V(botKnown(s,j))>V(mine));if(k.length)return k[0]}
   return botLeader(others);
 }
+/* 상대가 백작부인을 마지막으로 냈고, 그 뒤 손 카드가 바뀌지 않았으면 → 왕/왕자일 가능성 높음 */
+function countessTell(j){const R=G.R,d=R.discards[j];return R.alive[j]&&d.length&&d[d.length-1]==='countess'&&!(R.taint&&R.taint[j])}
+function guessWeights(s,j){
+  const u=unseenCounts(s),w={},maxV=Math.max(...Object.values(ED().values));
+  const held=Math.max(0,G.R.discards[j].length-1); // 오래 들고 있을수록 높은 카드일 가능성 ↑
+  for(const t in u){
+    if(t==='guard'||u[t]<=0)continue;
+    let x=u[t]*(1+0.25*Math.min(held,3)/3*V(t)/maxV);
+    if(countessTell(j)&&(t==='king'||t==='prince'))x*=5;
+    w[t]=x;
+  }
+  return w;
+}
 function botGuess(s,j){
   const k=botKnown(s,j);if(k&&k!=='guard')return k;
-  const u=unseenCounts(s);let best=[],m=0;
-  for(const t in u){if(t==='guard')continue;if(u[t]>m){m=u[t];best=[t]}else if(u[t]===m&&m>0)best.push(t)}
-  return best.length?pickR(best):pickR(Object.keys(u).filter(t=>t!=='guard'));
+  const w=guessWeights(s,j);let best=null,bs=-1;
+  for(const t in w){const sc=w[t]*(0.85+0.3*rnd());if(sc>bs){bs=sc;best=t}}
+  return best||pickR(Object.keys(ED().counts).filter(t=>t!=='guard'));
 }
 function botAction(){
   const s=G.cur,R=G.R;
@@ -829,7 +844,7 @@ const connectedPids=()=>{const s=new Set([O.pid]);Object.values(O.conns||{}).for
 /* 방장: 사람마다 보여도 되는 정보만 담아 보냄 */
 function viewFor(s){
   const c=JSON.parse(JSON.stringify(G));
-  delete c.R.seen;delete c.R.known;delete c.peekOrder;delete c.peekPos;delete c.peekShow;delete c.resume;
+  delete c.R.seen;delete c.R.known;delete c.R.taint;delete c.peekOrder;delete c.peekPos;delete c.peekShow;delete c.resume;
   const R=c.R,reveal=c.screen==='roundEnd'||c.screen==='gameEnd';
   R.log=R.log.slice(-12);
   R.deck=R.deck.map(()=>'x');
