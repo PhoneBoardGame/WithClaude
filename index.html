@@ -414,14 +414,14 @@ function chooseTarget(j){
   const R=G.R,i=G.cur;
   if(T.card==='priest'){
     T.reveal=[{label:`${nm(j)}의 카드`,card:R.hands[j][0]}];
-    T.msg=`${P(j,'의','의')} 카드를 몰래 확인했습니다.`;
+    T.msg=`${P(j,'의','의')} 카드를 몰래 확인했습니다.`;learn(i,j,R.hands[j][0]);
     addLog(`${P(i,'이','가')} 사제로 ${P(j,'의','의')} 카드를 봤습니다.`);
     note(j,`${P(i,'이','가')} 사제로 내 카드를 봤습니다.`);
   }else if(T.card==='baron'){
     const mine=R.hands[i][0],theirs=R.hands[j][0];
     T.reveal=[{label:'내 카드',card:mine},{label:`${nm(j)}의 카드`,card:theirs}];
     if(V(mine)===V(theirs)){
-      T.msg='숫자가 같아 아무도 탈락하지 않았습니다.';
+      T.msg='숫자가 같아 아무도 탈락하지 않았습니다.';learn(i,j,theirs);learn(j,i,mine);
       addLog(`${P(i,'이','가')} 남작으로 ${P(j,'와','과')} 비교 — 비김`);
       note(j,`${P(i,'이','가')} 남작으로 비교했습니다. 상대 카드도 ${C(theirs,'이었','였')}습니다 → 비김`);
     }else{
@@ -447,7 +447,7 @@ function chooseTarget(j){
     }
   }else if(T.card==='king'){
     const a=R.hands[i][0],b=R.hands[j][0];
-    R.hands[i]=[b];R.hands[j]=[a];
+    R.hands[i]=[b];R.hands[j]=[a];learn(i,j,a);learn(j,i,b);
     T.msg=`${P(j,'와','과')} 카드를 맞바꿨습니다.`;
     T.reveal=[{label:'넘겨준 카드',card:a},{label:'받은 카드',card:b}];
     addLog(`${P(i,'이','가')} 왕으로 ${P(j,'와','과')} 카드를 맞바꿨습니다.`);
@@ -513,6 +513,61 @@ function roundEnd(){
   G.screen='roundEnd';G.step=null;G.T=null;
 }
 function rematch(){G.players.forEach(p=>p.tokens=0);G.roundNo=0;G.starter=0;newRound()}
+
+/* ---------- AI 플레이어 ---------- */
+const pickR=a=>a[Math.floor(rnd()*a.length)];
+function learn(s,about,c){const R=G.R;if(!G.players[s]||!G.players[s].bot)return;R.known=R.known||{};(R.known[s]=R.known[s]||{})[about]={c,d:R.discards[about].length}}
+function botKnown(s,j){const k=G.R.known&&G.R.known[s]&&G.R.known[s][j];return k&&G.R.alive[j]&&G.R.discards[j].length===k.d?k.c:null}
+function unseenCounts(s){const c={...ED().counts},R=G.R;[...R.discards.flat(),...R.faceUp,...R.hands[s]].forEach(t=>{if(c[t]>0)c[t]--});return c}
+function botChoosePlay(s){
+  const h=G.R.hands[s];
+  if(isForced(h))return h.indexOf('countess');
+  let best=0,bs=1e9;
+  h.forEach((t,k)=>{
+    const o=h[1-k];let sc=V(t);
+    if(t==='princess')sc+=1000;
+    if(t==='baron')sc+=V(o)>=V('prince')?-4:V(o)<=V('priest')?6:1;
+    if(t==='king'&&o==='princess')sc+=30;
+    if(t==='prince'&&o==='princess'&&!validTargets('prince').some(j=>j!==s))sc+=1000;
+    if(t==='guard'&&G.players.some((_,j)=>j!==s&&!G.R.prot[j]&&botKnown(s,j)&&botKnown(s,j)!=='guard'))sc-=5;
+    if(t==='spy')sc-=1;
+    sc+=rnd()*0.6;
+    if(sc<bs){bs=sc;best=k}
+  });
+  return best;
+}
+function botLeader(list){if(rnd()<0.5)return pickR(list);const m=Math.max(...list.map(j=>G.players[j].tokens));return pickR(list.filter(j=>G.players[j].tokens===m))}
+function botTarget(s,c){
+  const tg=validTargets(c),others=tg.filter(j=>j!==s);
+  if(!others.length)return tg[0];
+  const known=others.filter(j=>botKnown(s,j));
+  const mine=G.R.hands[s][0];
+  if(c==='guard'){const k=known.filter(j=>botKnown(s,j)!=='guard');if(k.length)return pickR(k)}
+  if(c==='baron'&&mine){const k=known.filter(j=>V(botKnown(s,j))<V(mine));if(k.length)return pickR(k)}
+  if(c==='prince'){const k=known.filter(j=>botKnown(s,j)==='princess');if(k.length)return k[0]}
+  if(c==='priest'){const u=others.filter(j=>!botKnown(s,j));if(u.length)return botLeader(u)}
+  if(c==='king'&&mine){const k=known.filter(j=>V(botKnown(s,j))>V(mine));if(k.length)return k[0]}
+  return botLeader(others);
+}
+function botGuess(s,j){
+  const k=botKnown(s,j);if(k&&k!=='guard')return k;
+  const u=unseenCounts(s);let best=[],m=0;
+  for(const t in u){if(t==='guard')continue;if(u[t]>m){m=u[t];best=[t]}else if(u[t]===m&&m>0)best.push(t)}
+  return best.length?pickR(best):pickR(Object.keys(u).filter(t=>t!=='guard'));
+}
+function botAction(){
+  const s=G.cur,R=G.R;
+  switch(G.step){
+    case 'draw':return ['draw'];
+    case 'choose':return ['play',botChoosePlay(s)];
+    case 'target':return ['tgt',botTarget(s,G.T.card)];
+    case 'guess':return ['guess',botGuess(s,G.T.target)];
+    case 'chKeep':{const h=R.hands[s];let k=0;h.forEach((t,i)=>{if(V(t)>V(h[k]))k=i});return ['keep',k]}
+    case 'chOrder':return ['bottom',rnd()<.5?0:1];
+    case 'result':return ['end'];
+  }
+  return [];
+}
 
 /* 검증된 게임 행동 (각자 휴대폰 모드에서 방장이 사용) */
 function applyGame(s,a,v){
@@ -748,12 +803,13 @@ function saveOnline(){
 function loadOnline(){try{const s=localStorage.getItem(OKEY);return s?JSON.parse(s):null}catch(e){return null}}
 function clearOnline(){try{localStorage.removeItem(OKEY)}catch(e){}}
 function lobbyList(){return [{pid:O.pid,name:O.name},...O.order.map(pid=>({pid,name:O.names[pid]||'?'}))]}
-const connectedPids=()=>{const s=new Set([O.pid]);Object.values(O.conns||{}).forEach(e=>{if(e.pid)s.add(e.pid)});return s};
+const isBotPid=p=>typeof p==='string'&&p.startsWith('bot-');
+const connectedPids=()=>{const s=new Set([O.pid]);Object.values(O.conns||{}).forEach(e=>{if(e.pid)s.add(e.pid)});O.order.filter(isBotPid).forEach(p=>s.add(p));if(G)G.players.forEach(p=>{if(p.bot)s.add(p.pid)});return s};
 
 /* 방장: 사람마다 보여도 되는 정보만 담아 보냄 */
 function viewFor(s){
   const c=JSON.parse(JSON.stringify(G));
-  delete c.R.seen;delete c.peekOrder;delete c.peekPos;delete c.peekShow;delete c.resume;
+  delete c.R.seen;delete c.R.known;delete c.peekOrder;delete c.peekPos;delete c.peekShow;delete c.resume;
   const R=c.R,reveal=c.screen==='roundEnd'||c.screen==='gameEnd';
   R.log=R.log.slice(-12);
   R.deck=R.deck.map(()=>'x');
@@ -771,7 +827,17 @@ function sendTo(entry){
     else if(G)entry.conn.send({t:'st',sv:O.seq,st:viewFor(G.players.findIndex(p=>p.pid===entry.pid))});
   }catch(e){}
 }
-function broadcast(){O.seq++;Object.values(O.conns||{}).forEach(sendTo)}
+function broadcast(){O.seq++;Object.values(O.conns||{}).forEach(sendTo);scheduleBot()}
+const BOT_DELAY={draw:700,choose:1000,target:900,guess:900,chKeep:1000,chOrder:700,result:1500};
+function scheduleBot(){
+  clearTimeout(O.bt);
+  if(O.role!=='host'||O.phase!=='game'||!G||G.screen!=='turn'||!G.players[G.cur]||!G.players[G.cur].bot)return;
+  O.bt=setTimeout(()=>{
+    if(!G||G.screen!=='turn'||!G.players[G.cur].bot)return;
+    const [a,v]=botAction();
+    if(a&&applyGame(G.cur,a,v)){broadcast();saveOnline();render()}
+  },(typeof BOT_FAST!=='undefined'&&BOT_FAST)?3:(BOT_DELAY[G.step]||900));
+}
 function setupHost(peer){
   O.peer=peer;O.conns={};O.connected=true;
   peer.on('connection',conn=>{
@@ -841,12 +907,12 @@ async function hostResume(st){
   if(!peer){O.busy=false;O.err='방을 다시 열지 못했어요. 메뉴에서 나간 뒤 새 방을 만들어 주세요.';return render()}
   Object.assign(O,{code:st.code,role:'host',pid:st.pid,name:st.name,ed:st.ed||'classic',order:st.order||[],names:st.names||{},lastN:st.lastN||{},seq:st.seq||0,busy:false,err:''});
   if(st.G){G=st.G;O.phase='game';O.me=G.players.findIndex(p=>p.pid===O.pid)}else{O.phase='lobby';O.order=[]}
-  setupHost(peer);makeQR();render();
+  setupHost(peer);makeQR();render();scheduleBot();
 }
 function hostStart(){
   const list=lobbyList(),ed=EDITIONS[O.ed];
   if(list.length<ed.min||list.length>ed.max)return;
-  G={mode:'online',ed:O.ed,players:list.map(p=>({pid:p.pid,name:p.name,tokens:0})),target:ed.tokens[list.length],roundNo:0,starter:0};
+  G={mode:'online',ed:O.ed,players:list.map(p=>({pid:p.pid,name:p.name,tokens:0,bot:isBotPid(p.pid)})),target:ed.tokens[list.length],roundNo:0,starter:0};
   newRound();O.phase='game';O.me=0;
   broadcast();saveOnline();
 }
@@ -901,7 +967,7 @@ function sanitizeState(st){
     if(N<2||N>6)return null;
     if(![...R.deck,...R.faceUp,...R.hands.flat(),...R.discards.flat()].every(ok))return null;
     if(R.setAside!=null&&!ok(R.setAside))return null;
-    st.players.forEach(p=>{p.name=String(p.name).slice(0,8);p.pid=String(p.pid);p.tokens=+p.tokens||0});
+    st.players.forEach(p=>{p.name=String(p.name).slice(0,8);p.pid=String(p.pid);p.tokens=+p.tokens||0;p.bot=!!p.bot});
     st.roundNo=+st.roundNo||0;st.target=+st.target||0;st.cur=+st.cur||0;st.starter=+st.starter||0;
     if(!Array.isArray(R.log))R.log=[];
     if(!Array.isArray(R.notes))R.notes=st.players.map(()=>[]);
@@ -975,7 +1041,7 @@ function renderLobby(){
   const host=O.role==='host';
   const list=host?lobbyList():O.lobby;
   const ed=EDITIONS[O.ed],n=list.length;
-  const rows=list.map((p,k)=>`<div class="namerow"><span class="seat">${k+1}</span><span style="flex:1;font-weight:700">${esc(p.name)}${k===0?'<span class="tag">방장</span>':''}${p.pid===O.pid?'<span class="tag" style="background:#c39437">나</span>':''}</span></div>`).join('');
+  const rows=list.map((p,k)=>`<div class="namerow"><span class="seat">${k+1}</span><span style="flex:1;font-weight:700">${esc(p.name)}${k===0?'<span class="tag">방장</span>':''}${p.pid===O.pid?'<span class="tag" style="background:#c39437">나</span>':''}${isBotPid(p.pid)?'<span class="tag" style="background:#5b6170">AI</span>':''}</span>${host&&isBotPid(p.pid)?`<button class="ib" style="width:34px;height:34px;font-size:15px;background:#eadcc1;color:#6b2335" data-a="o-rmbot" data-v="${esc(p.pid)}" aria-label="AI 빼기">✕</button>`:''}</div>`).join('');
   const conn=(!O.connected&&host)?'<div class="conn">연결 서버와 끊겼어요. 다시 연결하는 중…</div>':'';
   if(host){
     if(!O.qr)makeQR();
@@ -988,7 +1054,8 @@ function renderLobby(){
       ${location.protocol==='file:'?'<p class="warn2">지금은 파일을 직접 연 상태라 QR로 들어올 수 없어요. 인터넷 주소(GitHub Pages 등)에 올린 뒤 그 주소로 열어 주세요.</p>':''}
     </div>
     <div class="panel"><h2>참가자 ${n}명 <small>· ${ed.label} (${ed.min}~${ed.max}인)</small></h2>${rows}
-      <p class="hint">들어온 순서대로 <b>시계 방향</b>으로 앉아 주세요.<br>토큰 ${ed.tokens[Math.min(Math.max(n,2),ed.max)]}개를 먼저 모으면 승리</p></div>
+      <button class="btn ghost" style="width:100%;margin:10px 0 0;color:var(--ink);border-color:var(--line)" data-a="o-addbot" ${n>=ed.max?'disabled':''}>🤖 AI 플레이어 추가</button>
+      <p class="hint">들어온 순서대로 <b>시계 방향</b>으로 앉아 주세요. AI는 방장 휴대폰이 대신 둬요.<br>토큰 ${ed.tokens[Math.min(Math.max(n,2),ed.max)]}개를 먼저 모으면 승리</p></div>
     <button class="btn big rose" data-a="o-start" ${n<ed.min||n>ed.max?'disabled':''}>${n<ed.min?'참가자를 기다리는 중…':n>ed.max?`최대 ${ed.max}명까지 가능해요`:'게임 시작 (카드 나눠 주기)'}</button>`;
   }
   const inList=list.some(p=>p.pid===O.pid);
@@ -1180,6 +1247,10 @@ function act(a,v){
     case 'o-join':guestJoin(O.hashCode||O.typedCode.trim().toLowerCase());return;
     case 'o-nocode':O.hashCode='';try{location.hash=''}catch(e){}break;
     case 'o-start':hostStart();break;
+    case 'o-addbot':if(O.role==='host'&&O.phase==='lobby'&&lobbyList().length<EDITIONS[O.ed].max){
+      let k=1;const used=new Set(O.order.filter(isBotPid).map(p=>O.names[p]));while(used.has('🤖AI'+k))k++;
+      const pid='bot-'+rid().slice(0,8);O.order.push(pid);O.names[pid]='🤖AI'+k;broadcast();saveOnline()}break;
+    case 'o-rmbot':if(O.role==='host'&&O.phase==='lobby'&&isBotPid(v)){O.order=O.order.filter(p=>p!==v);broadcast();saveOnline()}break;
     case 'zoom':{
       const me=MODE==='online'?O.me:G.cur,h=G.R.hands[me]||[],k=+v;
       if(!h[k])break;
