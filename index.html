@@ -246,6 +246,7 @@ table.ref .cname{font-weight:700;white-space:nowrap}
 .warn2{background:#fbe7ea;border:1px solid #e9a9b6;color:#8e1f36;font-size:13px;border-radius:10px;padding:8px 12px;margin:8px 0;text-align:center}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/mqtt@5/dist/mqtt.min.js';document.head.appendChild(s)"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';document.head.appendChild(s)"></script>
 </head>
 <body>
@@ -873,8 +874,49 @@ function scheduleBot(){
     if(a&&applyGame(G.cur,a,v)){broadcast();saveOnline();render()}
   },(typeof BOT_FAST!=='undefined'&&BOT_FAST)?3:(BOT_DELAY[G.step]||900));
 }
+/* ---- 예비 경로: MQTT 중계 서버 (직접 연결이 안 될 때) ---- */
+const MQTT_URLS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
+const TOPIC=code=>'loveletter-kr-v1/'+code;
+async function mqttReady(){for(let k=0;k<50&&!(window.mqtt&&window.mqtt.connect);k++)await new Promise(r=>setTimeout(r,100));return !!(window.mqtt&&window.mqtt.connect)}
+function mqttConnect(){
+  return new Promise((res,rej)=>{
+    let i=0;
+    const tryOne=()=>{
+      if(i>=MQTT_URLS.length)return rej(new Error('relay'));
+      let c,done=false;
+      try{c=window.mqtt.connect(MQTT_URLS[i++],{connectTimeout:6000,reconnectPeriod:3000,clean:true,clientId:'ll_'+rid()})}catch(e){return tryOne()}
+      const t=setTimeout(()=>{if(done)return;done=true;try{c.end(true)}catch(e){}tryOne()},7000);
+      c.on('connect',()=>{if(done)return;done=true;clearTimeout(t);res(c)});
+      c.on('error',()=>{});
+    };
+    tryOne();
+  });
+}
+const parseMsg=p=>{try{return JSON.parse(typeof p==='string'?p:new TextDecoder().decode(p))}catch(e){return null}};
+async function hostRelay(){
+  if(!(await mqttReady()))return false;
+  let mq;try{mq=await mqttConnect()}catch(e){return false}
+  if(O.role!=='host'){try{mq.end(true)}catch(e){}return false}
+  O.mq=mq;const base=TOPIC(O.code);
+  const sub=()=>{try{mq.subscribe(base+'/h')}catch(e){}};sub();mq.on('connect',sub);
+  mq.on('message',(topic,payload)=>{
+    const d=parseMsg(payload);if(!d||typeof d.g!=='string'||!d.m||typeof d.m!=='object')return;
+    const g=d.g.slice(0,24),id='m:'+g;
+    let e=O.conns[id];
+    if(!e){const conn={peer:id,open:true,relay:true,send:x=>{try{mq.publish(base+'/g/'+g,JSON.stringify(x))}catch(_){}}};e=O.conns[id]={conn,pid:null,relay:true}}
+    e.seen=Date.now();
+    if(d.m.t==='ping'){e.conn.send({t:'pong'});if(!e.pid)e.conn.send({t:'who'});return}
+    if(d.m.t==='bye'){hostOnClose(e.conn);return}
+    hostOnData(e.conn,d.m);
+  });
+  clearInterval(O.mqSweep);
+  O.mqSweep=setInterval(()=>{const now=Date.now();Object.values(O.conns).forEach(e=>{if(e.relay&&now-e.seen>20000)hostOnClose(e.conn)})},5000);
+  render();return true;
+}
 function setupHost(peer){
   O.peer=peer;O.conns={};O.connected=true;
+  hostRelay();
+  if(!peer)return;
   peer.on('connection',conn=>{
     O.conns[conn.peer]={conn,pid:null};
     conn.on('data',d=>hostOnData(conn,d));
@@ -923,7 +965,7 @@ async function hostCreate(){
     code=randCode();
     try{peer=await openPeer(PEER_PREFIX+code)}catch(e){if(e&&e.type!=='unavailable-id')break}
   }
-  if(!peer){O.busy=false;O.err='연결 서버에 접속하지 못했어요. 잠시 후 다시 시도해 주세요.';return render()}
+  if(!peer&&!(await mqttReady())){O.busy=false;O.err='연결 서버에 접속하지 못했어요. 잠시 후 다시 시도해 주세요.';return render()}
   Object.assign(O,{code,role:'host',pid:O.pid||rid(),phase:'lobby',order:[],names:{},lastN:{},seq:0,busy:false});
   setupHost(peer);
   try{location.hash='room-'+code}catch(e){}
@@ -939,7 +981,7 @@ async function hostResume(st){
       else break;
     }
   }
-  if(!peer){O.busy=false;O.err='방을 다시 열지 못했어요. 메뉴에서 나간 뒤 새 방을 만들어 주세요.';return render()}
+  if(!peer&&!(await mqttReady())){O.busy=false;O.err='방을 다시 열지 못했어요. 메뉴에서 나간 뒤 새 방을 만들어 주세요.';return render()}
   Object.assign(O,{code:st.code,role:'host',pid:st.pid,name:st.name,ed:st.ed||'classic',order:st.order||[],names:st.names||{},lastN:st.lastN||{},seq:st.seq||0,busy:false,err:''});
   if(st.G){G=st.G;O.phase='game';O.me=G.players.findIndex(p=>p.pid===O.pid)}else{O.phase='lobby';O.order=[]}
   setupHost(peer);makeQR();render();scheduleBot();
@@ -959,27 +1001,52 @@ async function guestJoin(code){
   if(!(await libReady())){O.busy=false;O.err=LIBFAIL;return render()}
   const st=loadOnline();
   if(st&&st.code===code&&st.role==='guest'){O.pid=st.pid;O.actN=st.actN||0}
-  let peer;
-  try{peer=await openPeer(null)}catch(e){O.busy=false;O.err='연결 서버에 접속하지 못했어요. 잠시 후 다시 시도해 주세요.';return render()}
-  Object.assign(O,{peer,code,role:'guest',pid:O.pid||rid(),phase:'lobby',busy:false,sv:null,connected:true,hostSeen:false,notFound:false});
-  peer.on('error',e=>{if(e&&e.type==='peer-unavailable'){O.hostSeen=false;O.notFound=true;render();scheduleReconnect()}});
-  watchSignal(peer);
-  connectHost();
+  let peer=null;
+  try{peer=await openPeer(null)}catch(e){peer=null}
+  Object.assign(O,{peer,code,role:'guest',pid:O.pid||rid(),phase:'lobby',busy:false,sv:null,connected:true,hostSeen:false,notFound:false,relay:false,via:''});
+  if(peer){
+    peer.on('error',e=>{if(e&&e.type==='peer-unavailable'){O.hostSeen=false;O.notFound=true;render();scheduleReconnect()}});
+    watchSignal(peer);
+    connectHost();
+    clearTimeout(O.ft);O.ft=setTimeout(()=>{if(!(O.conn&&O.conn.open&&O.hostSeen))startRelayGuest()},7000);
+  }else startRelayGuest();
   try{location.hash='room-'+code}catch(e){}
   saveOnline();render();
 }
 function scheduleReconnect(){clearTimeout(O.rt);O.rt=setTimeout(connectHost,3000)}
 function connectHost(){
-  if(!O.peer||O.peer.destroyed||O.role!=='guest')return;
+  if(O.relay||!O.peer||O.peer.destroyed||O.role!=='guest')return;
   if(O.conn&&O.conn.open)return;
   let conn;
-  try{conn=O.peer.connect(PEER_PREFIX+O.code,{reliable:true})}catch(e){return scheduleReconnect()}
+  try{conn=O.peer.connect(PEER_PREFIX+O.code,{reliable:true,serialization:'json'})}catch(e){return scheduleReconnect()}
   O.conn=conn;
-  conn.on('open',()=>{O.hostSeen=true;O.notFound=false;try{conn.send({t:'hello',pid:O.pid,name:O.name})}catch(e){}render()});
+  conn.on('open',()=>{if(O.relay){try{conn.close()}catch(e){}return}O.hostSeen=true;O.notFound=false;O.via='direct';clearTimeout(O.ft);try{conn.send({t:'hello',pid:O.pid,name:O.name})}catch(e){}render()});
   conn.on('data',guestOnData);
-  const lost=()=>{if(O.conn!==conn)return;O.hostSeen=false;O.pending=false;render();scheduleReconnect()};
+  const lost=()=>{if(O.relay||O.conn!==conn)return;O.hostSeen=false;O.pending=false;render();scheduleReconnect();
+    clearTimeout(O.ft);O.ft=setTimeout(()=>{if(!(O.conn&&O.conn.open&&O.hostSeen))startRelayGuest()},7000)};
   conn.on('close',lost);conn.on('error',lost);
   setTimeout(()=>{if(O.conn===conn&&!conn.open){try{conn.close()}catch(e){}lost()}},9000);
+}
+async function startRelayGuest(){
+  if(O.relay||O.role!=='guest')return;
+  if(O.conn&&O.conn.open&&O.hostSeen)return;
+  O.relay=true;O.via='relay';O.notFound=false;render();
+  if(!(await mqttReady())){O.relay=false;O.err=LIBFAIL;render();return}
+  let mq;try{mq=await mqttConnect()}catch(e){O.relay=false;render();clearTimeout(O.ft);O.ft=setTimeout(startRelayGuest,4000);return}
+  if(O.role!=='guest'){try{mq.end(true)}catch(e){}return}
+  clearTimeout(O.rt);clearTimeout(O.ft);
+  try{if(O.conn&&O.conn.close)O.conn.close()}catch(e){}
+  try{if(O.peer)O.peer.destroy()}catch(e){}O.peer=null;
+  O.mq=mq;const base=TOPIC(O.code),gid=O.gid||(O.gid=rid());
+  const conn={open:true,relay:true,send:m=>{try{mq.publish(base+'/h',JSON.stringify({g:gid,m}))}catch(e){}}};
+  O.conn=conn;
+  const hello=()=>conn.send({t:'hello',pid:O.pid,name:O.name});
+  const sub=()=>{try{mq.subscribe(base+'/g/'+gid,{},()=>hello())}catch(e){}};sub();mq.on('connect',sub);
+  mq.on('message',(t,p)=>{const d=parseMsg(p);if(!d)return;O.lastHost=Date.now();if(!O.hostSeen){O.hostSeen=true;render()}
+    if(d.t==='pong')return;if(d.t==='who'){hello();return}guestOnData(d)});
+  clearInterval(O.ping);
+  O.ping=setInterval(()=>{conn.send({t:'ping'});if(Date.now()-(O.lastHost||0)>15000&&O.hostSeen){O.hostSeen=false;O.pending=false;render()}},4000);
+  setTimeout(()=>conn.send({t:'ping'}),300);
 }
 function guestOnData(d){
   if(!d||typeof d!=='object')return;
@@ -1032,10 +1099,12 @@ function onlineGameAct(a,v){
   clearTimeout(O.pt);O.pt=setTimeout(()=>{O.pending=false;render()},3000);
 }
 function leaveOnline(){
-  clearTimeout(O.rt);
+  clearTimeout(O.rt);clearTimeout(O.ft);clearInterval(O.ping);clearInterval(O.mqSweep);
+  try{if(O.role==='guest'&&O.relay&&O.conn)O.conn.send({t:'bye'})}catch(e){}
   try{O.peer&&O.peer.destroy()}catch(e){}
+  try{O.mq&&O.mq.end(true)}catch(e){}
   clearOnline();
-  Object.assign(O,{phase:'menu',role:null,code:'',hashCode:'',peer:null,conn:null,conns:{},order:[],names:{},lobby:[],sv:null,seq:0,actN:0,lastN:{},pending:false,err:'',busy:false,memo:{},qr:null,qrFor:'',me:-1,hostSeen:false});
+  Object.assign(O,{phase:'menu',role:null,code:'',hashCode:'',peer:null,conn:null,conns:{},order:[],names:{},lobby:[],sv:null,seq:0,actN:0,lastN:{},pending:false,err:'',busy:false,memo:{},qr:null,qrFor:'',me:-1,hostSeen:false,mq:null,relay:false,via:'',gid:null});
   G=null;MODE=null;UI.sheet=null;
   try{if(location.hash)location.hash=''}catch(e){}
 }
@@ -1098,8 +1167,9 @@ function renderLobby(){
   return `<button class="backlink" data-a="menu">☰ 메뉴</button>${conn}
   <div class="banner"><div class="crown">💌</div><div class="turnlabel">방 ${esc(O.code.toUpperCase())}</div>
     <h1 class="serif">${esc(O.name)}</h1>
-    <p>${!O.hostSeen?(O.notFound?'방을 찾지 못했어요. 코드가 맞는지, 방장 화면이 켜져 있는지 확인해 주세요. (자동으로 다시 시도 중)':'방장에게 연결하는 중…'):inList?'방장이 게임을 시작하면 카드를 받아요.':'입장 처리 중…'}</p></div>
-  <div class="panel"><h2>참가자 ${n}명 <small>· ${ed.label}</small></h2>${rows||'<p class="hint">불러오는 중…</p>'}</div>`;
+    <p>${!O.hostSeen&&O.relay?'중계 서버로 방장에게 연결하는 중…':!O.hostSeen?(O.notFound?'방을 찾지 못했어요. 코드가 맞는지, 방장 화면이 켜져 있는지 확인해 주세요. (자동으로 다시 시도 중)':'방장에게 연결하는 중…'):inList?'방장이 게임을 시작하면 카드를 받아요.':'입장 처리 중…'}</p></div>
+  <div class="panel"><h2>참가자 ${n}명 <small>· ${ed.label}</small></h2>${rows||'<p class="hint">불러오는 중…</p>'}</div>
+  ${O.hostSeen?`<p class="hint">연결 방식: ${O.via==='relay'?'중계 서버':'직접 연결'}</p>`:''}`;
 }
 function renderTable(){
   const R=G.R,N=G.players.length,me=O.me;
