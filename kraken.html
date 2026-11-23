@@ -86,6 +86,9 @@ input[type=text]{flex:1;min-width:0;background:rgba(0,0,0,.25);border:1px solid 
 .tbarw.warn .tfill{background:linear-gradient(90deg,#ff5a6e,#ff9a7a)}
 .tbsec{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11.5px;font-weight:800;color:var(--mute)}
 .tbsec.warn{color:var(--red)}
+.jinfo{margin-top:12px;font-size:14px;line-height:1.7;color:#cfe0ec}
+.jinfo small{color:var(--mute);font-size:12px}
+.linkbtn{display:block;margin:16px auto 0;background:none;color:var(--mute);font-size:13px;text-decoration:underline;text-underline-offset:3px}
 .qrwrap{display:inline-block;background:#fff;padding:12px;border-radius:16px;margin:4px 0 10px;min-width:244px;min-height:244px}
 .qrwrap img,.qrwrap canvas{display:block;margin:0 auto}
 .qrfail{color:#334;font-size:13px;line-height:1.5;margin:80px 10px}
@@ -254,6 +257,21 @@ input[type=text]{flex:1;min-width:0;background:rgba(0,0,0,.25);border:1px solid 
       <p class="cinfo" style="margin:10px 0 0">방장 휴대폰에서 게임이 진행돼요. 방장은 게임이 끝날 때까지 화면을 켜 두세요. 시간 제한은 방장 설정을 따라요.</p>
     </div>
     <button class="big" id="startBtn">⚓ 출항하기</button>
+  </section>
+
+  <!-- QR로 들어온 사람 전용 입장 화면 -->
+  <section id="joinScreen" class="hidden">
+    <div class="logo"><span class="oct">🐙</span><h1>노 터치 크라켄</h1><p>초대받은 방에 입장해요</p></div>
+    <div class="panel" style="text-align:center">
+      <div class="rcode">방 코드 <b id="jCode">----</b></div>
+      <div class="jinfo" id="jInfo"></div>
+      <button class="big ghost hidden" id="jRetry" style="margin-top:10px">다시 연결</button>
+    </div>
+    <div class="panel">
+      <div class="row"><label>내 이름</label><input type="text" id="joinName" maxlength="6" placeholder="이름 (최대 6자)"></div>
+    </div>
+    <button class="big" id="jEnter">⚓ 입장하기</button>
+    <button class="linkbtn" id="jOther">직접 방 만들기 · 혼자 하기</button>
   </section>
 
   <!-- 대기실 -->
@@ -969,8 +987,12 @@ const Sound = (() => {
   }
   function onPeerError(err) { if (err && err.type === 'network') toast('네트워크가 불안정해요'); }
 
+  function roomInfo() {
+    return { t: 'info', code: NET.code, time: cfg.time, inGame: !!NET.inGame, seats: NET.seats.map(s => ({ name: s.name, kind: s.kind })) };
+  }
   function bcLobby() {
     if (!isHost()) return;
+    (NET.previews || []).forEach(c => safeSend(c, roomInfo()));
     const m = { t: 'lobby', code: NET.code, time: cfg.time, seats: NET.seats.map(s => ({ name: s.name, kind: s.kind })) };
     NET.seats.forEach(s => { if (s.kind === 'remote' && s.connected) safeSend(s.conn, m); });
   }
@@ -979,6 +1001,12 @@ const Sound = (() => {
     if (!isHost() || !d) return;
     conn._seen = Date.now();
     if (d.a === 'ping') return;
+    if (d.a === 'info') { // QR로 들어온 사람이 입장 전에 방 정보를 확인
+      NET.previews = NET.previews || [];
+      if (!NET.previews.includes(conn)) NET.previews.push(conn);
+      safeSend(conn, roomInfo());
+      return;
+    }
     if (d.a === 'join') {
       const name = String(d.name || '선원').trim().slice(0, 6) || '선원';
       if (!NET.inGame) {
@@ -988,6 +1016,7 @@ const Sound = (() => {
         while (NET.seats.some(s => s.name === nm)) nm = name.slice(0, 5) + (k++);
         conn._seen = Date.now();
         NET.seats.push({ name: nm, kind: 'remote', conn, connected: true });
+        if (NET.previews) NET.previews = NET.previews.filter(c => c !== conn);
         Sound.play('pop'); Sound.vib(20);
         renderLobby(); bcLobby();
         return;
@@ -1020,6 +1049,7 @@ const Sound = (() => {
 
   function onHostClose(conn) {
     if (!isHost()) return;
+    if (NET.previews) NET.previews = NET.previews.filter(c => c !== conn);
     const pid = NET.seats.findIndex(s => s.conn === conn);
     if (pid < 0) return;
     const st = NET.seats[pid];
@@ -1106,6 +1136,7 @@ const Sound = (() => {
     if (!isClient() || !d) return;
     switch (d.t) {
       case 'ping': break;
+      case 'info': showRoomInfo(d); break;
       case 'lobby':
         NET.lobby = d; cfg.time = d.time;
         if (NET.inGame || !$('#game').classList.contains('hidden')) { NET.inGame = false; gid++; S = null; stopTimer(); clearLayer(); Sound.bgm(false); }
@@ -1177,7 +1208,7 @@ const Sound = (() => {
   }
 
   // ---------- 로비 ----------
-  function showScreen(name) { ['start', 'lobby', 'game'].forEach(n => $('#' + n).classList.toggle('hidden', n !== name)); window.scrollTo(0, 0); }
+  function showScreen(name) { ['start', 'joinScreen', 'lobby', 'game'].forEach(n => $('#' + n).classList.toggle('hidden', n !== name)); window.scrollTo(0, 0); }
   function roomUrl() { return location.origin + location.pathname + '?room=' + NET.code; }
   function showLobby() {
     showScreen('lobby');
@@ -1257,7 +1288,64 @@ const Sound = (() => {
   $('#hostBtn').onclick = () => { Sound.init(); Sound.play('confirm'); hostRoom(); };
   $('#joinBtn').onclick = () => { Sound.init(); Sound.play('confirm'); joinRoom($('#joinCode').value); };
 
-  function readName() { return ($('#myName').value || '나').trim().slice(0, 6) || '나'; }
+  function readName() {
+    const el = !$('#joinScreen').classList.contains('hidden') ? $('#joinName') : $('#myName');
+    return (el.value || '나').trim().slice(0, 6) || '나';
+  }
+
+  // ---------- QR로 들어온 사람 전용 입장 화면 ----------
+  async function previewRoom(code) {
+    showScreen('joinScreen');
+    $('#jCode').textContent = code;
+    $('#jInfo').innerHTML = '<span class="spin">⚓</span> 방 정보를 불러오는 중…';
+    try { await loadLibs(); } catch (e) { $('#jInfo').innerHTML = '연결 도구를 불러오지 못했어요.<br>인터넷 연결을 확인하고 새로고침해 주세요.'; return; }
+    if (NET) { try { NET.peer.destroy(); } catch (e) {} }
+    const peer = new Peer({ debug: 0 });
+    NET = { role: 'client', peer, code, conn: null, inGame: false, lobby: null, preview: true };
+    peer.on('open', () => {
+      const conn = peer.connect(PEER_PREFIX + code, { reliable: true });
+      NET.conn = conn;
+      conn.on('open', () => { conn._seen = Date.now(); safeSend(conn, { a: 'info' }); });
+      conn.on('data', d => { conn._seen = Date.now(); onClientMsg(d); });
+      conn.on('close', () => { if (isClient() && NET.conn === conn) { if (NET.preview) $('#jInfo').innerHTML = '방과 연결이 끊겼어요. 새로고침해 주세요.'; else onClientLost(); } });
+    });
+    peer.on('error', err => {
+      if (!isClient() || !NET.preview) return;
+      $('#jInfo').innerHTML = err.type === 'peer-unavailable'
+        ? '방을 찾을 수 없어요.<br>방장이 방을 닫았거나 코드가 바뀌었을 수 있어요.'
+        : '연결하지 못했어요 (' + (err.type || '오류') + ')';
+      $('#jRetry').classList.remove('hidden');
+    });
+  }
+  function showRoomInfo(d) {
+    if (!isClient()) return;
+    $('#jRetry').classList.add('hidden');
+    const people = d.seats.map(s => (s.kind === 'host' ? '👑' : s.kind === 'ai' ? '🤖' : '📱') + s.name).join(' · ');
+    $('#jInfo').innerHTML = `⏱ 시간 제한 <b>${d.time ? d.time + '초' : '없음'}</b><br>👥 현재 <b>${d.seats.length}명</b> (최대 8명)<br><small>${people}</small>`
+      + (d.inGame ? '<br><span style="color:var(--gold2)">지금 게임이 진행 중이에요. 연결이 끊겼던 사람만 같은 이름으로 다시 들어갈 수 있어요.</span>' : '')
+      + (d.seats.length >= 8 && !d.inGame ? '<br><span style="color:var(--red)">방이 꽉 찼어요.</span>' : '');
+  }
+  function enterRoom() {
+    if (!isClient() || !NET.conn || !NET.conn.open) { joinRoom($('#jCode').textContent); return; }
+    cfg.name = readName();
+    NET.preview = false;
+    const conn = NET.conn;
+    safeSend(conn, { a: 'join', name: cfg.name });
+    keepAwake();
+    const hb = setInterval(() => {
+      if (!isClient() || NET.conn !== conn || !conn.open) { clearInterval(hb); return; }
+      safeSend(conn, { a: 'ping' });
+      if (Date.now() - conn._seen > 15000) { clearInterval(hb); try { conn.close(); } catch (e) {} onClientLost(); }
+    }, 3000);
+    toast('입장하는 중…');
+  }
+  $('#jEnter').onclick = () => { Sound.init(); Sound.play('confirm'); enterRoom(); };
+  $('#jRetry').onclick = () => previewRoom($('#jCode').textContent);
+  $('#jOther').onclick = () => {
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    if (NET) { const n = NET; NET = null; try { n.peer.destroy(); } catch (e) {} }
+    showScreen('start'); applyMode();
+  };
 
   // 모드에 따라 시작 화면 구성 바꾸기
   function applyMode() {
@@ -1273,11 +1361,11 @@ const Sound = (() => {
     if (NET_OK) { qrBtn.disabled = false; qrBtn.querySelector('.tag').remove(); qrBtn.querySelector('small').textContent = '각자 휴대폰으로 · 방장이 QR 생성'; }
     else qrBtn.querySelector('.tag').textContent = 'GitHub 버전';
     const room = new URLSearchParams(location.search).get('room');
-    if (NET_OK && room) {
-      cfg.mode = 'qr'; $('#joinCode').value = room.toUpperCase().slice(0, 4);
-      $('#joinHint').classList.remove('hidden');
-    }
     applyMode();
+    if (NET_OK && room) {
+      cfg.mode = 'qr'; $('#joinCode').value = room.toUpperCase().slice(0, 4); applyMode();
+      previewRoom(room.toUpperCase().slice(0, 4));
+    }
   })();
 
   // ================= 게임 진행 =================
@@ -1289,6 +1377,7 @@ const Sound = (() => {
     }
     gid++; S = null; busy = false; ME = 0; pendingPick = null; localDeclareSubmit = null;
     stopTimer(); clearLayer(); Sound.bgm(false);
+    try { if (location.search.includes('room=')) history.replaceState(null, '', location.pathname); } catch (e) {}
     showScreen('start'); applyMode();
   }
   function leaveGame() {
