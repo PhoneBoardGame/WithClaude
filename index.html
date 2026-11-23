@@ -292,6 +292,33 @@ table.ref .cname{font-weight:700;white-space:nowrap}
 #app.tablemode .mine .tg{padding:11px 14px;font-size:15px}
 
 .namerow .seat{position:static;transform:none;width:30px;font-size:14px;color:#fff;text-align:center}
+
+/* 카드 나눠 주기 */
+.fly{position:absolute;width:28px;height:39px;margin:-19px 0 0 -14px;border-radius:4px;background:repeating-linear-gradient(45deg,#7a2a3e 0 4px,#5e1d2f 4px 8px);border:1.5px solid var(--gold);box-shadow:0 4px 10px rgba(0,0,0,.5);z-index:5;pointer-events:none;
+  animation:dealfly 420ms cubic-bezier(.2,.7,.3,1) both}
+@keyframes dealfly{from{left:50%;top:50%;transform:rotate(-25deg) scale(1.15)}to{left:var(--x);top:var(--y);transform:rotate(0) scale(1)}}
+.mb.ghost{background:none;border:1.5px dashed rgba(212,173,85,.35);box-shadow:none}
+.aside{position:absolute;left:57%;top:46%;width:24px;height:34px;margin:-17px 0 0 -12px;border-radius:4px;transform:rotate(78deg);background:repeating-linear-gradient(45deg,#6b2335 0 4px,#4e1626 4px 8px);border:1.5px solid rgba(212,173,85,.7);box-shadow:0 2px 5px rgba(0,0,0,.5)}
+.dealing{text-align:center;margin:26px 16px;color:#e2c9b3;font-size:15px;animation:pulse 1.2s infinite}
+
+.rnb{font:inherit;font-weight:700;color:var(--ink);padding:2px 6px;margin:-2px -6px;border-radius:8px;border:1px dashed transparent}
+.rnb:active,.rnb:hover{border-color:var(--line);background:#fffaf0}
+.rnb small{font-size:12px;opacity:.7}
+.rnrow{display:flex;align-items:center;gap:8px}.rnicon{font-size:26px}
+
+/* 카드 여러 장을 한 줄로 */
+.rowcards{display:flex;gap:8px;justify-content:center;align-items:flex-start;margin:6px 12px}
+.rowcards .cell{flex:1 1 0;max-width:120px;min-width:0;text-align:center}
+.rowcards .cell .lbl{font-size:12px;color:#e2c9b3;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowcards .card{max-width:none!important;width:100%}
+.rowcards .cell.kept{opacity:.75}
+.rowcards .cell.kept .card{border-style:dashed}
+#app.tablemode .mine .hand.three{flex-wrap:nowrap;gap:8px;margin:4px 12px}
+#app.tablemode .mine .hand.three .card{flex:1 1 0;max-width:120px!important}
+
+.notes.compact{padding:6px 12px;margin:6px 16px;font-size:13px}
+.notes.compact h3{font-size:11.5px;margin-bottom:2px}
+.notes.compact .li{padding:3px 0}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/mqtt@5/dist/mqtt.min.js';document.head.appendChild(s)"></script>
@@ -301,7 +328,7 @@ table.ref .cname{font-weight:700;white-space:nowrap}
 <div id="app"></div>
 <script>
 const BUILD='web'; // 'web'(GitHub) | 'artifact'(claude.ai)
-const MULTI_URL='https://traveler226.github.io/fjqmfpxj/';
+const MULTI_URL='https://phoneboardgame.github.io/WithClaude/';
 const KEY='loveletter-pnp-v1', OKEY='loveletter-peer-v1', SKEY='loveletter-solo-v1';
 const NET=()=>MODE==='online'||MODE==='solo';
 const TYPES={
@@ -358,8 +385,17 @@ function hasBatchim(s){
   return false;
 }
 const jo=(s,a,b)=>esc(s)+(hasBatchim(s)?a:b);
-const nm=i=>G.players[i]?esc(G.players[i].name):'?';
-const P=(i,a,b)=>G.players[i]?jo(G.players[i].name,a,b):'?';
+/* 이름 표시: AI는 이름 앞에 🤖 아이콘을 붙여서 보여 줌 (이름 자체엔 아이콘 없음) */
+const bareName=n=>String(n==null?'':n).replace(/^🤖+/,'');
+const dispName=(n,bot)=>(bot?'🤖':'')+esc(bareName(n));
+const nm=i=>G.players[i]?dispName(G.players[i].name,G.players[i].bot):'?';
+const P=(i,a,b)=>G.players[i]?(G.players[i].bot?'🤖':'')+jo(bareName(G.players[i].name),a,b):'?';
+const MEDIEVAL=['에드먼드','로잘린','기욤','이졸데','퍼시벌','엘레노어','가웨인','베아트리체','롤랑','마틸다','알라릭','세실리아','오스윈','로웨나','트리스탄','이베트','고드프리','브리짓','레지널드','아델라','휴버트','엘로이즈','볼드윈','이사벨','세드릭','오필리아','레오폴드','길리언'];
+function botName(exceptPid){
+  const used=new Set(Object.entries(O.names||{}).filter(([p])=>p!==exceptPid).map(([,n])=>bareName(n)));
+  const free=MEDIEVAL.filter(n=>!used.has(n));
+  return free.length?free[Math.floor(rnd()*free.length)]:'기사'+(used.size+1);
+}
 const C=(t,a,b)=>jo(TYPES[t].name,a,b);
 function rnd(){try{const u=new Uint32Array(1);crypto.getRandomValues(u);return u[0]/4294967296}catch(e){return Math.random()}}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -429,6 +465,7 @@ function sfx(name){
     case 'win':[72,76,79,84].forEach((m,k)=>tone(mf(m),t+k*0.11,0.5,{vol:0.22}));[72,76,79].forEach(m=>tone(mf(m),t+0.5,1.1,{vol:0.12}));break;
     case 'lose':tone(mf(67),t,0.3,{vol:0.15});tone(mf(64),t+0.18,0.5,{vol:0.13});break;
     case 'champ':[60,64,67,72,67,72,76,79].forEach((m,k)=>tone(mf(m),t+k*0.13,0.45,{vol:0.2}));[72,76,79,84].forEach(m=>tone(mf(m),t+1.1,1.6,{vol:0.1}));break;
+    case 'deal':noise(t,0.09,{f:2600,to:1100,vol:0.13});tone(240,t+0.06,0.06,{type:'sine',vol:0.08});break;
     case 'tick':tone(1500,t,0.05,{type:'square',vol:0.05});break;
     case 'protect':tone(mf(84),t,0.5,{type:'sine',vol:0.12});tone(mf(88),t+0.08,0.5,{type:'sine',vol:0.1});break;
   }
@@ -527,6 +564,7 @@ function newRound(){
        prot:G.players.map(()=>false),notes:G.players.map(()=>[]),log:[],seen:G.players.map(()=>0),dnotes:G.players.map(()=>[])};
   G.cur=G.starter;G.step=null;G.T=null;G.resume=false;G.last=null;G.champs=null;
   addLog(`라운드 ${G.roundNo} 시작 — ${nm(G.cur)}부터 시계 방향`);
+  G.dealAt=Date.now();G.dealMs=(typeof BOT_FAST!=='undefined'&&BOT_FAST)?0:dealTotal(n);
   if(G.mode==='online')startTurn();
   else{
     G.peekOrder=[];for(let k=1;k<n;k++)G.peekOrder.push((G.starter+k)%n);
@@ -548,8 +586,15 @@ function validTargets(c){
 }
 function toResult(){G.step='result'}
 function startTurn(){G.R.prot[G.cur]=false;G.screen='turn';G.step='draw';G.T=null;UI.sel=null;
-  G.auto=false;G.deadline=(G.mode==='online'&&G.tl>0&&!G.players[G.cur].bot)?Date.now()+G.tl*1000:null}
-function doDraw(){const R=G.R,i=G.cur;R.hands[i].push(R.deck.shift());R.notes[i]=[];G.step='choose';UI.sel=null}
+  G.auto=false;G.deadline=(G.mode==='online'&&G.tl>0&&!G.players[G.cur].bot)?Date.now()+G.tl*1000+dealLeft():null}
+const DEAL_STEP=280,DEAL_FLY=420;
+const dealTotal=n=>(n+1)*DEAL_STEP+DEAL_FLY+300;
+const dealLeft=()=>G&&G.dealAt?Math.max(0,G.dealAt+(G.dealMs||0)-Date.now()):0;
+function doDraw(){const R=G.R,i=G.cur;R.hands[i].push(R.deck.shift());exReset(i);G.step='choose';UI.sel=null}
+/* 공개 정보: 경비병 추측이 빗나간 카드는 그 사람 손에 없음 (그 사람이 다시 뽑기 전까지) */
+function exAdd(j,t){const R=G.R;R.ex=R.ex||{};const a=R.ex[j]||(R.ex[j]=[]);if(!a.includes(t))a.push(t)}
+function exReset(j){const R=G.R;if(R.ex)delete R.ex[j]}
+const exOf=j=>(G.R.ex&&G.R.ex[j])||[];
 const isForced=h=>h.includes('countess')&&(h.includes('king')||h.includes('prince'));
 
 const IMMEDIATE=['princess','handmaid','countess','spy','chancellor'];
@@ -627,6 +672,7 @@ function chooseTarget(j){
     }
   }else if(T.card==='prince'){
     dset(i,j===i?'자신을 지목':`${nm(j)} 지목`);
+    exReset(j);
     const d=R.hands[j].shift();dpush(j,d,j===i?'내 왕자로 버림':`${P(i,'의','의')} 왕자로 지목되어 버림`);
     if(d==='princess'){
       dset(j,(j===i?'내 왕자로 버림':`${P(i,'의','의')} 왕자로 지목되어 버림`)+' → 탈락');eliminate(j);
@@ -642,7 +688,8 @@ function chooseTarget(j){
     }
   }else if(T.card==='king'){
     const a=R.hands[i][0],b=R.hands[j][0];
-    R.hands[i]=[b];R.hands[j]=[a];learn(i,j,a);learn(j,i,b);(R.taint=R.taint||{})[j]=true;dset(i,`${P(j,'와','과')} 카드 교환`);
+    R.hands[i]=[b];R.hands[j]=[a];learn(i,j,a);learn(j,i,b);(R.taint=R.taint||{})[j]=true;
+    {R.ex=R.ex||{};const ei=R.ex[i],ej=R.ex[j];delete R.ex[i];delete R.ex[j];if(ej)R.ex[i]=ej;if(ei)R.ex[j]=ei}dset(i,`${P(j,'와','과')} 카드 교환`);
     T.msg=`${P(j,'와','과')} 카드를 맞바꿨습니다.`;
     T.reveal=[{label:'넘겨준 카드',card:a},{label:'받은 카드',card:b}];
     addLog(`${P(i,'이','가')} 왕으로 ${P(j,'와','과')} 카드를 맞바꿨습니다.`);
@@ -658,6 +705,7 @@ function resolveGuard(g){
     T.msg=`적중! ${P(j,'의','의')} 카드는 ${gn}. <b>${nm(j)} 탈락!</b>`;
     addLog(`${P(i,'이','가')} 경비병으로 ${P(j,'을','를')} 지목, '${gn}' 추측 — 적중! <b>${nm(j)} 탈락</b>`);
   }else{
+    exAdd(j,g);
     T.msg=`빗나갔습니다. ${P(j,'의','의')} 카드는 ${C(g,'이','가')} 아닙니다.`;
     addLog(`${P(i,'이','가')} 경비병으로 ${P(j,'을','를')} 지목, '${gn}' 추측 — 빗나감`);
   }
@@ -679,7 +727,7 @@ function finishCh(n){
 }
 const roundOver=()=>aliveList().length<=1||G.R.deck.length===0;
 function endTurn(){
-  const R=G.R;R.seen[G.cur]=R.log.length;
+  const R=G.R;R.seen[G.cur]=R.log.length;R.notes[G.cur]=[];
   if(roundOver())return roundEnd();
   G.cur=nextAlive(G.cur);
   if(G.mode==='online')startTurn();
@@ -749,12 +797,12 @@ function botTarget(s,c){
   return botLeader(others);
 }
 /* 상대가 백작부인을 마지막으로 냈고, 그 뒤 손 카드가 바뀌지 않았으면 → 왕/왕자일 가능성 높음 */
-function countessTell(j){const R=G.R,d=R.discards[j];return R.alive[j]&&d.length&&d[d.length-1]==='countess'&&!(R.taint&&R.taint[j])}
+function countessTell(j){const R=G.R,d=R.discards[j],ex=exOf(j);return R.alive[j]&&d.length&&d[d.length-1]==='countess'&&!(R.taint&&R.taint[j])&&!(ex.includes('king')&&ex.includes('prince'))}
 function guessWeights(s,j){
   const u=unseenCounts(s),w={},maxV=Math.max(...Object.values(ED().values));
   const held=Math.max(0,G.R.discards[j].length-1); // 오래 들고 있을수록 높은 카드일 가능성 ↑
   for(const t in u){
-    if(t==='guard'||u[t]<=0)continue;
+    if(t==='guard'||u[t]<=0||exOf(j).includes(t))continue;
     let x=u[t]*(1+0.25*Math.min(held,3)/3*V(t)/maxV);
     if(countessTell(j)&&(t==='king'||t==='prince'))x*=5;
     w[t]=x;
@@ -802,12 +850,12 @@ function applyGame(s,a,v){
 function topbar(){
   const R=G.R;
   return `<div class="top"><button class="ib" data-a="menu" aria-label="메뉴">☰</button>
-  <div class="stat"><span>라운드 <b>${G.roundNo}</b></span><span>남은 덱 <b>${R.deck.length}</b>장</span><span>목표 <b>♥${G.target}</b></span></div>
+  <div class="stat"><span>라운드 <b>${G.roundNo}</b></span><span>남은 덱 <b>${R.deck.length+(NET()?dealPending():0)}</b>장</span><span>목표 <b>♥${G.target}</b></span></div>
   <button class="ib" data-a="info" aria-label="게임 정보">ⓘ</button></div>`;
 }
 function tokensRow(){
   const R=G.R;
-  return `<div class="tokens">${G.players.map((p,j)=>`<span class="tk ${j===G.cur&&G.screen!=='roundEnd'?'cur':''} ${R.alive[j]?'':'out'}">${esc(p.name)}${R.prot[j]?' 🌸':''} <b>♥${p.tokens}</b></span>`).join('')}</div>`;
+  return `<div class="tokens">${G.players.map((p,j)=>`<span class="tk ${j===G.cur&&G.screen!=='roundEnd'?'cur':''} ${R.alive[j]?'':'out'}">${dispName(p.name,p.bot)}${R.prot[j]?' 🌸':''} <b>♥${p.tokens}</b></span>`).join('')}</div>`;
 }
 function stepDots(){
   const labels=['뽑기','선택','능력','종료'];
@@ -815,9 +863,9 @@ function stepDots(){
   const cur=map[G.step];
   return labels.map((l,k)=>`<span class="${k===cur?'on':k<cur?'done':''}">${l}</span>`).join('');
 }
-function notesHTML(i){
+function notesHTML(i,compact){
   const n=G.R.notes[i]||[];
-  return n.length?`<div class="notes"><h3>🔒 나에게만 보이는 알림</h3>${n.map(x=>`<div class="li">${safe(x)}</div>`).join('')}</div>`:'';
+  return n.length?`<div class="notes ${compact?'compact':''}"><h3>🔒 나에게만 보이는 알림</h3>${n.map(x=>`<div class="li">${safe(x)}</div>`).join('')}</div>`:'';
 }
 /* 현재 플레이어의 차례 화면 본문 (두 모드 공용) */
 function turnBody(){
@@ -850,7 +898,7 @@ function turnBody(){
         if(j===i&&c!=='prince')return '';
         let why='';
         if(!R.alive[j])why='탈락';else if(j!==i&&R.prot[j])why='🌸 시녀 보호 중';
-        return `<button class="tg" ${why?'disabled':`data-a="tgt" data-v="${j}"`}><span>${j===i?'나 자신':esc(p.name)}</span><small>${why||'선택 ›'}</small></button>`;
+        return `<button class="tg" ${why?'disabled':`data-a="tgt" data-v="${j}"`}><span>${j===i?'나 자신':dispName(p.name,p.bot)}</span><small>${why||'선택 ›'}</small></button>`;
       }).join('')}</div><button class="btn ghost" data-a="undo">‹ 뒤로 (다른 카드 고르기)</button>`;
     }
     case 'guess':{
@@ -871,12 +919,26 @@ function turnBody(){
       <div class="hand three ${UI.desc?'wdesc':''}">${h.map((t,k)=>cardHTML(t,{cls:'sm',attr:`data-a="keep" data-v="${k}"`})).join('')}</div>
       <p class="hint">나머지 카드는 덱 맨 아래로 갑니다.</p>`;
     case 'chOrder':
+      if(ON)return `<div class="sec">덱 <b>가장 아래</b>에 둘 카드를 누르세요 <small style="color:#cdb8a6">(다른 1장은 그 바로 위)</small></div>
+      <div class="rowcards">${h.map(t=>`<div class="cell kept"><div class="lbl">남긴 카드</div>${cardHTML(t,{cls:'sm'})}</div>`).join('')}
+        ${(T.rest||[]).map((t,k)=>`<div class="cell"><div class="lbl">덱 아래로</div>${cardHTML(t,{cls:'sm',attr:`data-a="bottom" data-v="${k}"`})}</div>`).join('')}</div>`;
       return `<div class="sec">덱 <b>가장 아래</b>에 둘 카드를 누르세요</div>
       <div class="hand">${(T.rest||[]).map((t,k)=>cardHTML(t,{attr:`data-a="bottom" data-v="${k}"`})).join('')}</div>
       <p class="hint">다른 한 장은 그 바로 위에 놓입니다.</p>
       <div class="sec">남긴 카드</div><div class="hand">${h.map(t=>cardHTML(t,{cls:'sm'})).join('')}</div>`;
     case 'result':{
       const willEnd=roundOver();
+      const endBtn=`<button class="btn big gold" data-a="end">${willEnd?'턴 종료 → 라운드 결과':'턴 종료'}</button>`;
+      if(ON){
+        /* 내 손 카드(왼쪽) + 확인한 카드(오른쪽)를 한 줄로. 내 손 카드와 같은 공개 카드는 한 번만 */
+        const cells=[];
+        if(R.alive[i])h.forEach((t,k)=>cells.push(`<div class="cell"><div class="lbl">내 손 카드</div>${cardHTML(t,{cls:'sm',attr:zoomAttr(k)})}</div>`));
+        (T.reveal||[]).forEach(r=>{if(R.alive[i]&&(r.label==='내 카드'||r.label==='받은 카드'))return;cells.push(`<div class="cell"><div class="lbl">${safe(r.label)}</div>${cardHTML(r.card,{cls:'sm',attr:`data-a="zoomc" data-v="${r.card}"`})}</div>`)});
+        return `${endBtn}
+        ${R.alive[i]?'':'<div class="dead" style="margin:8px 16px">이번 라운드에서 탈락했습니다.</div>'}
+        ${cells.length?`<div class="rowcards">${cells.join('')}</div>`:''}
+        ${playedRow(T.card,safe(T.msg))}`;
+      }
       return `${playedRow(T.card,safe(T.msg))}
       ${(T.reveal||[]).length?`<div class="reveal">${T.reveal.map(r=>`<div><div class="lbl">${safe(r.label)}</div>${cardHTML(r.card,{cls:'sm'})}</div>`).join('')}</div>`:''}
       ${R.alive[i]?`<div class="sec">내 손 카드</div><div class="hand">${h.map((t,k)=>cardHTML(t,{cls:'sm',attr:zoomAttr(k)})).join('')}</div>`:'<div class="dead">이번 라운드에서 탈락했습니다.</div>'}
@@ -888,7 +950,7 @@ function turnBody(){
 }
 const canCtl=()=>G.mode!=='online'||O.role==='host';
 function scoreRows(hl){
-  return `<div class="rows">${G.players.map((p,j)=>`<div class="row ${hl.includes(j)?'win':''}"><div class="nm">${esc(p.name)}</div>${hearts(p.tokens,G.target)}</div>`).join('')}</div>`;
+  return `<div class="rows">${G.players.map((p,j)=>`<div class="row ${hl.includes(j)?'win':''}"><div class="nm">${dispName(p.name,p.bot)}</div>${hearts(p.tokens,G.target)}</div>`).join('')}</div>`;
 }
 function renderRoundEnd(){
   const R=G.R,L=G.last;
@@ -1074,7 +1136,7 @@ function scheduleBot(){
     if(!G||G.screen!=='turn'||!G.players[G.cur].bot)return;
     const [a,v]=botAction();
     if(a&&applyGame(G.cur,a,v)){broadcast();saveOnline();render()}
-  },(typeof BOT_FAST!=='undefined'&&BOT_FAST)?3:(BOT_DELAY[G.step]||900));
+  },(typeof BOT_FAST!=='undefined'&&BOT_FAST)?3:(BOT_DELAY[G.step]||900)+dealLeft());
 }
 /* ---- 예비 경로: MQTT 중계 서버 (직접 연결이 안 될 때) ---- */
 const MQTT_URLS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
@@ -1361,7 +1423,7 @@ function renderLobby(){
   const host=O.role==='host';
   const list=host?lobbyList():O.lobby;
   const ed=EDITIONS[O.ed],n=list.length;
-  const rows=list.map((p,k)=>`<div class="namerow"><span class="seat">${k+1}</span><span style="flex:1;font-weight:700">${esc(p.name)}${k===0?'<span class="tag">방장</span>':''}${p.pid===O.pid?'<span class="tag" style="background:#c39437">나</span>':''}${isBotPid(p.pid)?'<span class="tag" style="background:#5b6170">AI</span>':''}</span>${host&&isBotPid(p.pid)?`<button class="ib" style="width:34px;height:34px;font-size:15px;background:#eadcc1;color:#6b2335" data-a="o-rmbot" data-v="${esc(p.pid)}" aria-label="AI 빼기">✕</button>`:''}</div>`).join('');
+  const rows=list.map((p,k)=>`<div class="namerow"><span class="seat">${k+1}</span><span style="flex:1;font-weight:700">${host&&isBotPid(p.pid)?`<button class="rnb" data-a="rnbot" data-v="${esc(p.pid)}">${dispName(p.name,true)} <small>✏️</small></button>`:dispName(p.name,isBotPid(p.pid))}${k===0?'<span class="tag">방장</span>':''}${p.pid===O.pid?'<span class="tag" style="background:#c39437">나</span>':''}${isBotPid(p.pid)?'<span class="tag" style="background:#5b6170">AI</span>':''}</span>${host&&isBotPid(p.pid)?`<button class="ib" style="width:34px;height:34px;font-size:15px;background:#eadcc1;color:#6b2335" data-a="o-rmbot" data-v="${esc(p.pid)}" aria-label="AI 빼기">✕</button>`:''}</div>`).join('');
   const conn=(!O.connected&&host)?'<div class="conn">연결 서버와 끊겼어요. 다시 연결하는 중…</div>':'';
   if(host){
     const tlSeg=`<h2 style="margin-top:14px">시간제한 <small>(한 차례당)</small></h2><div class="seg">${[0,15,30,60].map(x=>`<button class="segb ${(O.tl||0)===x?'on':''}" data-a="o-tl" data-v="${x}"><b>${x?x+'초':'없음'}</b></button>`).join('')}</div>
@@ -1405,36 +1467,52 @@ function renderTable(){
   if(G.screen==='roundEnd')return head+renderRoundEnd();
   if(G.screen==='gameEnd')return renderGameEnd();
   const base=me<0?0:me,startK=me<0?0:1;
-  const myTurn=G.screen==='turn'&&G.cur===me&&!O.pending;
+  const DS=dealState(),dealIdx=j=>UI.deal?UI.deal.order.indexOf(j)+1:0;
+  const dealt=j=>!DS||DS.landed(dealIdx(j));
+  const pos={};
+  const myTurn=G.screen==='turn'&&G.cur===me&&!O.pending&&dealt(me);
   const pickable=myTurn&&G.step==='target'&&G.T?validTargets(G.T.card):[];
   const aimAt=myTurn&&G.step==='guess'&&G.T?G.T.target:-1;
   let seats='',piles='';
-  if(me>=0)piles+=pileHTML(me,50,50+33*0.58);
+  if(me>=0)piles+=pileHTML(me,50,50+33*0.66);
   for(let k=startK;k<N;k++){
     const j=(base+k)%N,p=G.players[j];
-    const th=(90+360*k/N)*Math.PI/180,x=50+40*Math.cos(th),y=50+33*Math.sin(th);
+    const th=(90+360*k/N)*Math.PI/180,x=50+40*Math.cos(th),y=50+33*Math.sin(th);pos[j]=[x,y];
     piles+=pileHTML(j,50+40*0.47*Math.cos(th),50+33*0.57*Math.sin(th));
     const out=!R.alive[j],m=memoOf(p.pid);
-    const backs=out?'<em>탈락</em>':R.hands[j].map(()=>'<i class="mb"></i>').join('');
+    const backs=out?'<em>탈락</em>':!dealt(j)?'<i class="mb ghost"></i>':R.hands[j].map(()=>'<i class="mb"></i>').join('');
     const memo=(m.guess?`<span>예상 ${TYPES[m.guess].name}</span>`:'')+(m.ex.length?`<span class="x">제외 ${m.ex.length}</span>`:'');
     const spy=hasSpy(j),pick=pickable.includes(j),aim=aimAt===j;
     seats+=`<div class="seat ${j===G.cur?'cur':''} ${out?'out':''} ${spy?'spy':''} ${pick?'pick':''} ${aim?'aim':''}" style="left:${x}%;top:${y}%">
-      <div class="sname">${isOn(j)?'':'📴 '}${esc(p.name)}${R.prot[j]?' 🌸':''}</div>
+      <div class="sname">${isOn(j)?'':'📴 '}${dispName(p.name,p.bot)}${R.prot[j]?' 🌸':''}</div>
       ${spy?`<button class="spyb" data-a="spyinfo" aria-label="스파이 정보">🕵️</button>`:''}
       <div class="sbacks" data-a="${pick?'tgt':'omemo'}" data-v="${j}">${backs}<em class="stk">♥${p.tokens}</em>${pick?'<span class="pickl">선택</span>':''}</div>
       ${memo?`<div class="smemo">${memo}</div>`:''}
       </div>`;
   }
+  if(me>=0)pos[me]=[50,97];
+  let fly='',deckN=R.deck.length,aside='';
+  if(DS){
+    for(let i=0;i<DS.n;i++){
+      if(!DS.started(i)){deckN++;continue}
+      if(DS.landed(i))continue;
+      const tgt=i===0?[57,46]:pos[UI.deal.order[i-1]];if(!tgt)continue;
+      fly+=`<i class="fly" style="--x:${tgt[0]}%;--y:${tgt[1]}%;animation-delay:-${DS.e-DS.startOf(i)}ms"></i>`;
+    }
+    if(!DS.started(0))deckN++;
+  }
+  if(!DS||DS.landed(0))aside='<i class="aside" title="따로 뺀 카드"></i>';
   const lastLog=R.log.length?safe(R.log[R.log.length-1]):'';
   const table=`<div class="ostat">${G.cur===me?'<b>내 차례</b>':`<span><b>${curName}</b>의 차례</span>`}<span class="hg" id="hg" style="display:none"></span>${G.auto?'<span class="autol">자동 진행 중</span>':''}</div>
   <button class="lastlog" data-a="olog">${lastLog}</button>
   <div class="tablewrap"><div class="felt"></div>
-    <div class="deck" data-a="info">${deckStack(R.deck.length)}<span class="dkc">덱 <b>${R.deck.length}</b></span></div>
-    ${piles}${seats}${me>=0?`<div class="memark ${pickable.includes(me)?'pick':''} ${hasSpy(me)?'spy':''}" style="top:94%" ${pickable.includes(me)?`data-a="tgt" data-v="${me}"`:''}>${hasSpy(me)?'<span data-a="spyinfo">🕵️</span> ':''}나 · ♥${G.players[me].tokens}${pickable.includes(me)?' · 선택':''}</div>`:''}</div>`;
+    ${aside}<div class="deck" data-a="info">${deckStack(deckN)}<span class="dkc">덱 <b>${deckN}</b></span></div>
+    ${piles}${seats}${fly}${me>=0?`<div class="memark ${pickable.includes(me)?'pick':''} ${hasSpy(me)?'spy':''}" style="top:94%" ${pickable.includes(me)?`data-a="tgt" data-v="${me}"`:''}>${hasSpy(me)?'<span data-a="spyinfo">🕵️</span> ':''}나 · ♥${G.players[me].tokens}${pickable.includes(me)?' · 선택':''}</div>`:''}</div>`;
   let low='';
   if(me<0)low='<p class="hint">이미 시작된 게임이라 관전 중이에요.</p>';
+  else if(DS&&!dealt(me))low=`<div class="minehead"><b class="serif">내 카드</b></div><div class="dealing">🂠 카드를 나눠 주는 중…</div>`;
   else if(G.cur===me&&G.screen==='turn'&&(R.alive[me]||G.step==='result')){
-    low=`<div class="minehead"><b class="serif">내 차례</b><span class="steps">${stepDots()}</span></div>`+turnBody();
+    low=`<div class="minehead"><b class="serif">내 차례</b><span class="steps">${stepDots()}</span></div>`+(G.step!=='draw'&&G.step!=='result'?notesHTML(me,true):'')+turnBody();
   }else{
     const myD=R.discards[me];
     low=`<div class="minehead"><b class="serif">내 카드</b><span class="stok" data-a="odisc" data-v="${me}" style="cursor:pointer">버린 카드 ${myD.length}장 ›</span></div>`+notesHTML(me)+
@@ -1442,7 +1520,7 @@ function renderTable(){
         <p class="hint">${curName}의 차례를 기다리는 중… 카드를 누르면 크게 볼 수 있어요.</p>`
       :'<div class="dead">이번 라운드에서 탈락했습니다.</div>');
   }
-  return head+table+`<div class="mine ${O.pending?'busy':''}">${low}</div>`;
+  return head+table+`<div class="mine ${O.pending||DS?'busy':''}">${low}</div>`;
 }
 /* 덱 그림: 5장 이하는 한 장씩 셀 수 있게, 그 이상은 촘촘한 더미 */
 function deckStack(n){
@@ -1451,6 +1529,30 @@ function deckStack(n){
   let h='';for(let k=0;k<layers;k++)h+=`<i style="transform:translate(${(k*off).toFixed(1)}px,${(-k*off).toFixed(1)}px)"></i>`;
   const ext=Math.round((layers-1)*off);
   return `<div class="stack ${few?'few':''}" style="width:${38+ext}px;height:${53+ext}px;margin-top:${ext}px">${h}</div>`;
+}
+/* ---------- 카드 나눠 주기 연출 ---------- */
+function checkDeal(){
+  if(!G||!G.R||G.mode!=='online'||G.screen!=='turn'||!G.dealAt)return;
+  if(UI.dealKey===G.dealAt)return;
+  UI.dealKey=G.dealAt;
+  const fresh=G.R.discards.every(d=>!d.length)&&G.step==='draw'&&G.cur===G.starter;
+  if(!fresh)return;
+  const N=G.players.length,order=[];for(let k=0;k<N;k++)order.push((G.starter+k)%N);
+  UI.deal={t0:Date.now(),order,played:0};
+}
+function dealState(){
+  const d=UI.deal;if(!d)return null;
+  const e=Date.now()-d.t0,n=d.order.length+1;
+  if(e>=n*DEAL_STEP+DEAL_FLY){UI.deal=null;return null}
+  return {e,n,startOf:i=>i*DEAL_STEP,landed:i=>e>=i*DEAL_STEP+DEAL_FLY,started:i=>e>=i*DEAL_STEP};
+}
+function dealPending(){const ds=dealState();if(!ds)return 0;let k=0;for(let i=0;i<ds.n;i++)if(!ds.started(i))k++;return k}
+function dealTick(){
+  clearTimeout(UI.dealT);UI.dealT=null;
+  const d=UI.deal;if(!d)return;
+  const ds=dealState();
+  if(ds){const st=Math.min(ds.n,Math.floor(ds.e/DEAL_STEP)+1);while(d.played<st){d.played++;sfx('deal')}}
+  UI.dealT=setTimeout(()=>{UI.dealT=null;render();if(UI.deal)dealTick();else render()},90);
 }
 const hasSpy=j=>G.ed==='v2019'&&G.R.discards[j]&&G.R.discards[j].includes('spy');
 function spyHTML(){
@@ -1487,7 +1589,7 @@ function renderSoloSetup(){
 }
 function soloStart(){
   Object.assign(O,{role:'host',pid:'me',name:O.name.trim().slice(0,8)||'나',code:'',phase:'lobby',order:[],names:{},conns:{},lastN:{},seq:0,peer:null,mq:null});
-  for(let k=1;k<=O.nbots;k++){const pid='bot-'+k;O.order.push(pid);O.names[pid]='🤖AI'+k}
+  for(let k=1;k<=O.nbots;k++){const pid='bot-'+k;O.order.push(pid);O.names[pid]=botName()}
   hostStart();
 }
 function renderOnline(){
@@ -1548,7 +1650,7 @@ function renderSheet(){
       ${R.faceUp.length?`<h3>공개로 제외된 카드</h3>${R.faceUp.map(chip).join('')}`:''}
       <p class="hint" style="color:var(--muted)">비공개로 따로 뺀 카드 1장${R.setAside?'':' (왕자로 사용됨)'}</p>
       <h3>플레이어</h3>
-      ${G.players.map((p,j)=>`<div class="pl ${R.alive[j]?'':'out'}"><div class="h"><span>${esc(p.name)} <span class="st">${!R.alive[j]?'· 탈락':R.prot[j]?'· 🌸 보호 중':''}${j===G.cur&&G.screen!=='roundEnd'?' · 차례':''}</span></span>${hearts(p.tokens,G.target)}</div>
+      ${G.players.map((p,j)=>`<div class="pl ${R.alive[j]?'':'out'}"><div class="h"><span>${dispName(p.name,p.bot)} <span class="st">${!R.alive[j]?'· 탈락':R.prot[j]?'· 🌸 보호 중':''}${j===G.cur&&G.screen!=='roundEnd'?' · 차례':''}</span></span>${hearts(p.tokens,G.target)}</div>
         <div class="ds">버린 카드: ${R.discards[j].length?R.discards[j].map(chip).join(''):'없음'}</div></div>`).join('')}
       <h3>카드 목록</h3>${refTable()}`;
       break;
@@ -1574,7 +1676,7 @@ function renderSheet(){
     case 'memo':{
       const j=UI.seat,p=G.players[j];if(!p){UI.sheet=null;return ''}
       const m=memoOf(p.pid),types=Object.keys(ED().counts);
-      c=`<h2>${esc(p.name)} <small style="font-size:13px;color:var(--muted)">${!R.alive[j]?'탈락':R.prot[j]?'🌸 보호 중':''}</small></h2>
+      c=`<h2>${dispName(p.name,p.bot)} <small style="font-size:13px;color:var(--muted)">${!R.alive[j]?'탈락':R.prot[j]?'🌸 보호 중':''}</small></h2>
       <h3>예상 카드 <small style="font-weight:400;color:var(--muted)">(하나만)</small></h3>
       <div class="mopts" style="grid-template-columns:repeat(${types.length},1fr)">${types.map(t=>`<button class="mo ${m.guess===t?'on':''}" style="--c:${TYPES[t].color}" data-a="mguess" data-v="${t}" aria-label="${TYPES[t].name}">${V(t)}<small>${moName(t)}</small></button>`).join('')}</div>
       <h3>제외 카드 <small style="font-weight:400;color:var(--muted)">(여러 개)</small></h3>
@@ -1586,11 +1688,16 @@ function renderSheet(){
     }
     case 'disc':{
       const j=UI.seat,p=G.players[j];if(!p){UI.sheet=null;return ''}
-      c=`<h2>${j===O.me?'내':esc(p.name)+'의'} 버린 카드</h2>
+      c=`<h2>${j===O.me?'내':dispName(p.name,p.bot)+'의'} 버린 카드</h2>
       ${discGrid(j)}`;
       break;
     }
     case 'spy':c=spyHTML();break;
+    case 'rename':c=`<h2>🤖 AI 이름 바꾸기</h2>
+      <div class="rnrow"><span class="rnicon">🤖</span><input class="tin" data-rn maxlength="8" placeholder="이름 (최대 8자)" value="${esc(UI.rnDraft||'')}"></div>
+      <p class="hint" style="color:var(--muted)">이름 앞의 🤖 아이콘은 항상 붙어요.</p>
+      <button class="btn ghost" style="width:100%;margin:6px 0 0;color:var(--ink);border-color:var(--line)" data-a="rnrand">🎲 무작위 중세 이름</button>
+      <button class="btn rose" style="width:100%" data-a="rnsave">저장</button>`;break;
     case 'sound':c=`<h2>🔊 소리 설정</h2>
       ${[['bgm','배경음악','중세풍 류트 선율'],['sfx','효과음','카드 뽑기·내기, 탈락, 승리 등'],['vib','진동','내 차례, 탈락, 상대를 탈락시켰을 때 (안드로이드만)']].map(([k,t,d])=>`<button class="srow" data-a="snd" data-v="${k}"><span><b>${t}</b><small>${d}</small></span><span class="toggle ${SND[k]?'on':''}" style="pointer-events:none"><span class="sw"></span><b>${SND[k]?'ON':'OFF'}</b></span></button>`).join('')}
       <p class="hint" style="color:var(--muted)">아이폰은 진동을 지원하지 않아요. 무음 모드에서는 소리가 나지 않을 수 있어요.</p>`;break;
@@ -1610,12 +1717,14 @@ function render(){
   else html=renderOnline();
   const sheet=renderSheet();
   const bar=`<div class="bottombar"><button class="toggle sndb" data-a="soundset" aria-label="소리 설정">${SND.bgm||SND.sfx?'🔊':'🔇'}</button><button class="toggle ${UI.desc?'on':''}" data-a="desc" aria-pressed="${UI.desc}"><span>부연설명</span><span class="sw"></span><b>${UI.desc?'ON':'OFF'}</b></button></div>`;
+  if(NET()&&O.phase==='game'){checkDeal();if(UI.deal&&!UI.dealT)dealTick()}
   const tm=NET()&&G&&G.screen==='turn'&&O.phase==='game';
   const mn=document.querySelector&&document.querySelector('.mine'),mst=mn?mn.scrollTop:0,mkey=G?G.cur+':'+G.step:'';
   $app.className=tm?'tablemode':'';
   $app.innerHTML=html+bar+sheet;
   if(tm&&mst&&mkey===UI.mkey&&document.querySelector){const m2=document.querySelector('.mine');if(m2)m2.scrollTop=mst}
   UI.mkey=mkey;
+  if(UI.sheet==='rename'&&document.querySelector){const inp=document.querySelector('input[data-rn]');if(inp&&UI.rnFocus){try{inp.focus();const l=inp.value.length;inp.setSelectionRange(l,l)}catch(e){}}}
   soundDiff();
   if(st&&document.querySelector){const s2=document.querySelector('.sheet');if(s2)s2.scrollTop=st}
   if(MODE==='local')save();
@@ -1676,8 +1785,10 @@ function act(a,v){
     case 'solostart':soloStart();break;
     case 'soloresume':{const sv=loadSolo();if(sv&&sv.G){MODE='solo';G=sv.G;Object.assign(O,{role:'host',pid:'me',name:sv.name||'나',ed:sv.ed||G.ed,phase:'game',conns:{},order:[],names:{},peer:null,mq:null,me:0});scheduleBot()}break}
     case 'o-addbot':if(O.role==='host'&&O.phase==='lobby'&&lobbyList().length<EDITIONS[O.ed].max){
-      let k=1;const used=new Set(O.order.filter(isBotPid).map(p=>O.names[p]));while(used.has('🤖AI'+k))k++;
-      const pid='bot-'+rid().slice(0,8);O.order.push(pid);O.names[pid]='🤖AI'+k;broadcast();saveOnline()}break;
+      const pid='bot-'+rid().slice(0,8);O.names[pid]=botName();O.order.push(pid);broadcast();saveOnline()}break;
+    case 'rnbot':if(O.role==='host'&&O.phase==='lobby'&&isBotPid(v)){UI.rnPid=v;UI.rnDraft=bareName(O.names[v]);UI.sheet='rename';UI.rnFocus=true}break;
+    case 'rnrand':UI.rnDraft=botName(UI.rnPid);UI.rnFocus=false;break;
+    case 'rnsave':{const n=bareName(UI.rnDraft).trim().slice(0,8);if(n&&UI.rnPid&&O.names[UI.rnPid]!=null){O.names[UI.rnPid]=n;broadcast();saveOnline()}UI.sheet=null;UI.rnFocus=false;break}
     case 'o-rmbot':if(O.role==='host'&&O.phase==='lobby'&&isBotPid(v)){O.order=O.order.filter(p=>p!==v);broadcast();saveOnline()}break;
     case 'zoom':{
       const me=NET()?O.me:G.cur,h=G.R.hands[me]||[],k=+v;
@@ -1708,6 +1819,7 @@ document.addEventListener('input',e=>{
   if(d.name!=null)UI.setup.names[+d.name]=e.target.value;
   if(d.oname!=null)O.name=e.target.value;
   if(d.ocode!=null)O.typedCode=e.target.value;
+  if(d.rn!=null)UI.rnDraft=e.target.value;
 });
 
 /* ---------- boot ---------- */
