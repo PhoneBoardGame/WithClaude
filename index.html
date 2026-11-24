@@ -49,6 +49,7 @@ header p{margin:0;color:var(--mute);font-size:13.5px;line-height:1.5}
 .kraken{--c1:#1d4f7a;--c2:#3a2462}
 .love{--c1:#a23a5a;--c2:#5b1f3f}
 .celestia{--c1:#2b6e8f;--c2:#3f3f8f}
+.dhorse{--c1:#2e6b3f;--c2:#1c3a26}
 .soon{--c1:#2a3646;--c2:#1e2733;opacity:.55;pointer-events:none;box-shadow:none}
 .soon .go{background:rgba(255,255,255,.15);color:var(--mute)}
 .howto{margin-top:20px;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid var(--line);font-size:13px;line-height:1.65;color:#cfe0ec}
@@ -155,11 +156,13 @@ footer{text-align:center;color:var(--mute);font-size:11.5px;margin-top:18px}
       <div class="acts"><a class="go" href="celestia.html">플레이</a><a class="tut" href="tutorial.html#celestia">튜토리얼</a></div>
       <div class="reqs"></div>
     </div>
-    <div class="game soon" aria-disabled="true">
+    <div class="game dhorse" data-game="darkhorse">
+      <a class="main" href="darkhorse.html">
       <span class="ic">🏇</span>
-      <span class="tx"><b>다크호스</b><span class="desc">경주마에 몰래 걸고 순서를 뒤집는 베팅 게임</span>
-        <span class="meta"><span>👥 2~6명</span></span></span>
-      <span class="go">준비 중</span>
+      <span class="tx"><b>다크호스</b><span class="desc">마권을 몰래 쥐고 경주 순서를 뒤집는 베팅 게임</span>
+        <span class="meta"><span>👥 2~6명</span><span>⏱ 15분</span></span></span></a>
+      <div class="acts"><a class="go" href="darkhorse.html">플레이</a><a class="tut" href="tutorial.html#darkhorse">튜토리얼</a></div>
+      <div class="reqs"></div>
     </div>
   </nav>
 
@@ -1517,7 +1520,7 @@ return {QRCode:req("index"),ECL:req("QRErrorCorrectLevel")};})();
    연결: MQTT 중계 서버(공개). 방장이 방 상태를 보관(retain)해서 늦게 온 사람도 바로 받음.
    게임 이동: 방장은 game.html?pbg=host&code=XXXX&name=…, 참가자는 ?pbg=join&code=XXXX&name=… */
 (function(){
-  var GAMES={kraken:{file:'kraken.html',name:'노 터치 크라켄'},loveletter:{file:'loveletter.html',name:'러브레터'},celestia:{file:'celestia.html',name:'셀레스티아'}};
+  var GAMES={kraken:{file:'kraken.html',name:'노 터치 크라켄'},loveletter:{file:'loveletter.html',name:'러브레터'},celestia:{file:'celestia.html',name:'셀레스티아'},darkhorse:{file:'darkhorse.html',name:'다크호스'}};
   var BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
   var TOP='pbg-hub-v1/',SKEY='pbg-hub-session',NKEY='pbg-name',STALE=15000,LATE=12000;
   var L={role:null,code:null,id:null,name:'',ready:false,req:[],mq:null,members:[],hostName:'',stateAt:0,joinedAt:0,goSeen:null,closed:false,conn:'',readySince:0};
