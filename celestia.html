@@ -2619,6 +2619,7 @@ const NET={role:'local',peer:null,ok:false,status:'',conns:new Map(),hostConn:nu
 try{NET.myId=sessionStorage.getItem('cel_pid')}catch(e){}
 if(!NET.myId){NET.myId='p'+Math.random().toString(36).slice(2,10);try{sessionStorage.setItem('cel_pid',NET.myId)}catch(e){}}
 const PEER_PREFIX='celestia-ty-v1-';
+const PBG={fixed:false,join:false,tries:0};
 function netClose(){clearInterval(NET.hb);NET.hb=null;try{NET.peer&&NET.peer.destroy()}catch(e){}NET.peer=null;NET.ok=false;NET.status='';NET.conns.clear();NET.hostConn=null;NET.role='local';}
 function hostOpen(code){
   netClose();NET.role='host';
@@ -2631,6 +2632,7 @@ function hostOpen(code){
   peer.on('open',()=>{clearTimeout(failT);NET.ok=true;NET.status='on';if(!G&&ROOM)renderRoom()});
   peer.on('error',e=>{
     if(NET.peer!==peer)return;
+    if(e&&e.type==='unavailable-id'&&ROOM&&!G&&PBG.fixed){const c=ROOM.code;setTimeout(()=>{if(ROOM&&!G&&ROOM.code===c){hostOpen(c);renderRoom()}},1500);return}
     if(e&&e.type==='unavailable-id'&&ROOM&&!G){ROOM.code=Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*24)]).join('');hostOpen(ROOM.code);renderRoom();return}
     if(!NET.ok){clearTimeout(failT);NET.status='off';if(!G&&ROOM)renderRoom()}
   });
@@ -2782,7 +2784,9 @@ function clientJoin(code){
     conn.on('data',d=>{NET.lastHost=Date.now();clientOnData(d)});
     conn.on('close',()=>{if(NET.role==='client')clientLost('방장과 연결이 끊어졌어요. 입장하기를 다시 누르면 이어서 할 수 있어요.')});
   });
-  peer.on('error',e=>{if(NET.role!=='client')return;clearTimeout(failT);clientLost(e&&e.type==='peer-unavailable'?'방을 찾을 수 없어요. 방장이 방을 열어 두었는지 확인해 주세요.':'연결 오류가 났어요 ('+(e&&e.type||'알 수 없음')+')')});
+  peer.on('error',e=>{if(NET.role!=='client')return;clearTimeout(failT);
+    if(e&&e.type==='peer-unavailable'&&PBG.join&&(PBG.tries=(PBG.tries||0)+1)<15){netClose();setTimeout(()=>{if(G||ROOM)return;renderJoin(code);const m=$('#jmsg');if(m)m.textContent='방장이 방을 여는 중이에요… 잠시만요';clientJoin(code)},2000);return}
+    clientLost(e&&e.type==='peer-unavailable'?'방을 찾을 수 없어요. 방장이 방을 열어 두었는지 확인해 주세요.':'연결 오류가 났어요 ('+(e&&e.type||'알 수 없음')+')')});
 }
 function clientLost(text){
   GEN++;pending=null;netClose();G=null;ROOM=null;diceModal=null;colorModal=null;endModal=null;closeAllModals();
@@ -2859,7 +2863,23 @@ function clientAsk(d){
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&NET.role==='client'&&NET.lastHost&&Date.now()-NET.lastHost>15000)clientLost('화면이 꺼진 동안 연결이 끊겼어요. 입장하기를 다시 누르면 이어서 할 수 있어요.')});
 
 /* ================= 시작 ================= */
-{const m=location.hash.match(/^#room-([A-Z]{4})$/);if(m)renderJoin(m[1]);else renderLobby();}
+{
+  /* 게임 선택 로비에서 함께 넘어온 경우: ?pbg=host|join&code=XXXX&name=… */
+  const q=new URLSearchParams(location.search),pb=q.get('pbg'),pc=(q.get('code')||'').toUpperCase();
+  const m=location.hash.match(/^#room-([A-Z]{4})$/);
+  if((pb==='host'||pb==='join')&&/^[A-Z]{4}$/.test(pc)){
+    const nm=(q.get('name')||'').trim().slice(0,8);if(nm){myName=nm;store('cel_name',nm)}
+    const waitPeer=f=>{let k=0;(function w(){if(typeof Peer!=='undefined'||++k>60)return f();setTimeout(w,100)})()};
+    if(pb==='host'){
+      try{history.replaceState(null,'',location.pathname)}catch(e){}
+      renderLobby();PBG.fixed=true;
+      waitPeer(()=>{ROOM={code:pc,exp:expOn,players:[{id:'me',name:myName,isAI:false,host:true}]};hostOpen(pc);renderRoom()});
+    }else{
+      try{history.replaceState(null,'',location.pathname+'#room-'+pc)}catch(e){}
+      PBG.join=true;renderJoin(pc);waitPeer(()=>clientJoin(pc));
+    }
+  }else if(m)renderJoin(m[1]);else renderLobby();
+}
 </script>
 </body>
 </html>

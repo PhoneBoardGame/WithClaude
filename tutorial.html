@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#081a30">
+<title>튜토리얼 · 휴대폰에서 즐기는 보드게임</title>
+<style>
+:root{--ink:#eef4fa;--mute:#9fb6ca;--c1:#1d4f7a;--c2:#3a2462;--acc:#ffd166}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#081a30;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;overflow:hidden}
+body{background:radial-gradient(120% 60% at 50% 0%,var(--c1) 0%,#0b2038 55%,#06121f 100%)}
+.wrap{max-width:520px;margin:0 auto;height:100vh;height:100dvh;display:flex;flex-direction:column;padding:calc(8px + env(safe-area-inset-top)) 14px calc(10px + env(safe-area-inset-bottom))}
+.top{display:flex;align-items:center;gap:8px;flex:none}
+.top a{color:var(--ink);text-decoration:none;font-size:13.5px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.08);white-space:nowrap}
+.top .ttl{flex:1;text-align:center;font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .cnt{font-size:12.5px;color:var(--mute);min-width:44px;text-align:right}
+.bar{height:4px;border-radius:4px;background:rgba(255,255,255,.12);margin:8px 2px 10px;flex:none;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc);border-radius:4px;transition:width .3s}
+.stage{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center}
+.phone{position:relative;height:100%;max-height:100%;aspect-ratio:390/844;border-radius:24px;overflow:hidden;box-shadow:0 0 0 3px rgba(255,255,255,.18),0 14px 40px rgba(0,0,0,.55);background:#000;cursor:pointer}
+.phone img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;transition:opacity .2s}
+.phone svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.ring{fill:none;stroke:var(--acc);stroke-width:3;vector-effect:non-scaling-stroke;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.card{flex:none;margin-top:10px;padding:12px 14px;border-radius:16px;background:rgba(10,20,35,.78);border:1px solid rgba(255,255,255,.12);min-height:112px}
+.card h2{margin:0 0 6px;font-size:17px;letter-spacing:-.3px;color:#fff}
+.card h2 .no{display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:11px;background:var(--acc);color:#1b1b1b;font-size:12px;margin-right:6px;vertical-align:2px}
+.card p{margin:0;font-size:13.5px;line-height:1.6;color:#dbe6f0;word-break:keep-all}
+.card b{color:var(--acc)}
+.nav{flex:none;display:flex;gap:8px;margin-top:10px}
+.nav button,.nav a{flex:1;padding:13px 8px;border-radius:14px;border:0;font:inherit;font-weight:800;font-size:15px;text-align:center;text-decoration:none;cursor:pointer}
+.prev{background:rgba(255,255,255,.1);color:var(--ink)}
+.prev:disabled{opacity:.35}
+.next{background:var(--acc);color:#1d1d1d;flex:1.6!important}
+.play{background:rgba(255,255,255,.14);color:var(--ink)}
+.hint{text-align:center;font-size:11px;color:var(--mute);margin-top:6px;flex:none}
+@media (max-height:640px){.card{min-height:0}.card p{font-size:12.5px;line-height:1.5}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a href="index.html">‹ 게임 선택</a><div class="ttl" id="ttl"></div><div class="cnt" id="cnt"></div></div>
+  <div class="bar"><i id="bar"></i></div>
+  <div class="stage"><div class="phone" id="phone"><img id="img" alt=""><svg id="ov" viewBox="0 0 100 100" preserveAspectRatio="none"></svg></div></div>
+  <div class="card"><h2 id="h"></h2><p id="t"></p></div>
+  <div class="nav" id="nav"></div>
+  <div class="hint">화면을 누르거나 옆으로 밀어도 넘어가요</div>
+</div>
+<script>
+const RECTS={"love":{"deal":[[0.51,12.32,98.97,41.95]],"table":[[0.0,15.32,100.0,22.42],[41.92,27.67,16.15,11.26],[41.84,49.68,16.33,3.32]],"draw":[[3.08,61.14,93.85,18.86],[3.08,80.0,93.85,6.87]],"choose":[[3.08,61.14,93.85,18.86]],"zoom":[[3.08,38.29,93.85,45.12],[3.08,83.65,93.85,7.11]],"target":[[0.0,31.64,24.1,6.04],[37.95,18.11,24.1,6.04],[76.71,31.64,23.29,6.04]],"guess":[[3.08,73.3,93.85,26.7]],"result":[[3.08,58.89,93.85,6.87],[3.08,89.1,93.85,10.9]],"notes":[[3.08,58.06,93.85,7.68]],"reveal":[[2.05,65.17,95.9,23.34]],"piles":[[43.85,39.44,12.31,5.57],[26.65,30.51,10.26,5.57],[44.87,22.8,10.26,5.57],[63.09,30.51,10.26,5.57]],"memo":[[3.08,29.06,93.85,9.22],[3.08,42.32,93.85,9.22]],"disc":[[3.08,61.85,93.85,28.91]],"roundend":[[0.0,6.87,100.0,26.3],[7.18,38.98,85.64,30.21],[7.18,81.87,85.64,18.13]],"gameend":[[0.0,0.47,100.0,24.64],[4,27,92,33]]},"kraken":{"role":[[29.74,33.47,40.51,25.83],[10.85,60.01,78.31,6.16]],"declare":[[3.08,65.28,93.85,10.43],[23.59,76.42,73.33,6.16],[23.59,82.58,73.33,6.64]],"table":[[2.05,5.92,95.9,10.14],[2.05,22.23,95.9,41.23]],"mybar":[[2.05,63.7,23.15,7.82],[25.2,63.7,72.75,7.82]],"pick":[[2.05,16.3,95.9,5.69],[4.62,28.86,81.79,33.18]],"confirm":[[0.0,77.84,100.0,22.16],[60.12,27.72,10.52,6.54]],"rec":[[31,34,38,38]],"reveal":[[2.05,71.52,95.9,7.77]],"roundend":[[5.97,31.1,88.05,37.8]],"result":[[5.97,23.64,88.05,52.73]]},"celestia":{"board":[[0.0,5.45,100.0,11.14],[0.0,0.0,100.0,100.0],[0.0,90.28,100.0,9.72],[86.67,0.18,11.79,5.45]],"roll":[[2.56,30.94,94.87,29.58]],"bluff":[[85.64,42.18,14.36,11.61],[0.0,79.38,100.0,11.85]],"decide":[[0.0,79.38,100.0,11.85],[0.0,58.06,100.0,22.27]],"resolve":[[0.0,79.38,100.0,11.85],[0.0,90.28,100.0,9.72],[85.64,42.18,14.36,11.61]],"crash":[[0.0,79.38,100.0,11.85],[85.64,39.69,14.36,16.59]],"gameend":[[2.56,21.8,94.87,47.87]]}};
+const GAMES={
+ loveletter:{name:'러브레터',file:'loveletter.html',key:'love',c1:'#7a2440',acc:'#ffc46b',slides:[
+  ['gameend','게임의 목적','공주에게 마음을 전하는 카드 게임이에요. 라운드마다 <b>끝까지 살아남거나, 끝났을 때 가장 높은 숫자의 카드</b>를 들고 있으면 호감 토큰 ♥ 1개를 받아요. ♥을 <b>목표 개수만큼 먼저 모으면 승리!</b> (2명 6개 · 3명 5개 · 4명 4개 · 5~6명 3개)'],
+  ['deal','카드 나눠 주기','라운드가 시작되면 덱에서 1장을 아무도 모르게 따로 빼 두고, 모두 <b>한 장씩</b> 받아요. 내 손에는 늘 1장만 들고 있어요.'],
+  ['table','테이블 보기','가운데는 <b>덱</b>, 둘레는 다른 사람 자리예요. 자리마다 뒷면 카드와 모은 ♥ 토큰이 보이고, 가운데 쪽에는 그 사람이 <b>낸 카드 더미</b>가 쌓여요. 맨 아래 "나"가 내 자리예요.'],
+  ['draw','① 카드 뽑기','내 차례가 되면 덱에서 <b>1장을 뽑아요</b>. 이제 손에 2장이 생겨요. 시간제한이 있으면 위에 ⏳ 남은 초가 보여요.'],
+  ['choose','② 낼 카드 고르기','두 장 중 <b>1장을 내고 1장은 손에 남겨요.</b> 남긴 카드가 라운드 끝까지 나를 지켜 줄 수도 있으니 신중하게! 왕·왕자와 백작부인을 같이 들고 있으면 백작부인을 꼭 내야 해요.'],
+  ['zoom','카드 크게 보기','카드를 누르면 크게 보이고 효과 설명이 나와요. 이 카드를 낼 거라면 아래 <b>"…을 냅니다"</b>를 눌러요.'],
+  ['target','③ 대상 고르기','경비병·사제·남작·왕자·왕은 대상이 필요해요. 테이블에서 <b>금색으로 빛나는 자리</b>를 누르거나 아래 목록에서 골라요. 시녀로 보호 중인 사람은 고를 수 없어요.'],
+  ['guess','경비병: 카드 맞히기','경비병은 상대 손에 든 카드를 추측해요. <b>맞히면 그 사람은 탈락!</b> 경비병끼리는 맞힐 수 없어요. 능력을 쓰기 전이라면 ‹ 뒤로 가기로 다시 고를 수 있어요.'],
+  ['result','④ 결과 보고 턴 종료','능력의 결과가 나오면 맨 위 <b>턴 종료</b>를 눌러 다음 사람에게 차례를 넘겨요.'],
+  ['notes','나에게만 보이는 알림','다른 사람이 내 카드를 보거나 바꾸면 <b>나에게만</b> 알림이 떠요. 누가 내 카드를 알고 있는지 기억해 두세요!'],
+  ['reveal','몰래 본 카드','사제로 상대 카드를 보면 <b>왼쪽에 내 카드, 오른쪽에 확인한 카드</b>가 나란히 나와요. 이 정보는 나만 알아요.'],
+  ['piles','버린 카드와 메모','가운데 쪽 카드 더미를 누르면 그 사람이 낸 카드를 볼 수 있어요. 자리 밑의 <b>"예상 왕"</b> 같은 표시는 내가 남긴 메모예요.'],
+  ['memo','상대 카드 메모하기','다른 사람의 뒷면 카드를 누르면 <b>예상 카드</b>와 <b>제외 카드</b>를 표시할 수 있어요. 예를 들어 백작부인을 낸 사람은 왕이나 왕자를 들고 있을 가능성이 높아요!'],
+  ['disc','카드가 어떻게 쓰였는지','버린 카드마다 <b>낸 순서</b>와 <b>어떻게 쓰였는지</b>가 적혀 있어요. 누가 누구를 노렸는지 추리에 활용해요.'],
+  ['roundend','라운드 끝','<b>한 명만 남거나 덱이 다 떨어지면</b> 라운드가 끝나요. 남은 사람끼리 손 카드를 비교해 가장 높은 사람이 ♥을 받고, 다음 라운드는 승자부터 시작해요. 카드별 효과는 게임 안 <b>카드 설명 보기</b>나 <b>부연설명 ON</b>으로 언제든 볼 수 있어요. 이제 직접 해 볼까요?']
+ ]},
+ kraken:{name:'노 터치 크라켄',file:'kraken.html',key:'kraken',c1:'#14466e',acc:'#5ee0c8',slides:[
+  ['role','게임의 목적','모두 몰래 <b>탐험대</b> 또는 <b>해적</b>이 돼요.<br>· 탐험대: 숨겨진 <b>보물 상자를 모두 찾으면</b> 승리<br>· 해적: <b>크라켄이 나오게 하거나</b>, 4라운드 동안 보물을 지켜 내면 승리<br>서로 정체를 숨기고 속고 속이는 게임이에요. 게임이 시작되면 이렇게 내 역할 카드를 뒤집어 확인해요.'],
+  ['declare','카드 확인하고 선언하기','라운드마다 카드를 받아요(5장→4장→3장→2장). 내 카드를 보고 <b>보물이 몇 개인지, 크라켄이 있는지</b> 선언해요. <b>거짓말해도 돼요!</b>'],
+  ['table','테이블 보기','위에는 이번 라운드에 <b>남은 선택</b> 수와 <b>찾은 보물</b>이 보여요. 자리마다 그 사람의 선언과 뒷면 카드가 있고, 🔦 손전등이 있는 사람이 지금 카드를 고를 차례예요.'],
+  ['mybar','내 역할 다시 보기','<b>"꾹 눌러 역할 보기"</b>를 길게 누르면 내 역할을 다시 볼 수 있어요. 옆에는 내가 받은 카드 구성이 나와요(섞어서 내려놓았기 때문에 어느 게 어느 건지는 나도 몰라요).'],
+  ['pick','내 차례: 카드 고르기','🔦 지목권이 오면 <b>다른 사람 카드 1장</b>을 골라 뒤집어요. 빛나는 카드가 고를 수 있는 카드예요. 선언과 지금까지 나온 카드를 보고 누가 거짓말하는지 추리해요.'],
+  ['confirm','선택 확인','고른 카드가 맞는지 한 번 더 물어봐요. 다른 카드를 누르면 바꿀 수 있고, <b>🔦 선택!</b>을 누르면 공개돼요.'],
+  ['rec','카드 공개','고른 카드가 공개돼요. 💎보물, 📦빈 상자, 🐙크라켄 중 하나예요. <b>카드 주인</b>이 다음 지목권을 받아요. 다른 사람 차례에 카드를 눌러 <b>추천</b>할 수도 있어요.'],
+  ['reveal','기록 확인','아래 기록에 누가 누구의 카드를 열었고 무엇이 나왔는지 남아요. 선언과 비교해 보면 정체가 보여요!'],
+  ['roundend','라운드 끝','한 라운드에 <b>인원수만큼</b> 카드가 공개되면 라운드가 끝나요. 공개된 카드는 빼고, 남은 카드를 섞어 다시 나눠요.'],
+  ['result','게임 끝','보물을 모두 찾으면 <b>탐험대 승리</b>, 크라켄이 나오거나 4라운드가 끝나면 <b>해적 승리</b>! 마지막에 모두의 정체가 공개돼요. 이제 직접 해 볼까요?']
+ ]},
+ celestia:{name:'셀레스티아',file:'celestia.html',key:'celestia',c1:'#2a6f96',acc:'#ffcf5a',slides:[
+  ['gameend','게임의 목적','비행선을 타고 구름 위 섬들을 건너며 <b>보물 카드</b>를 모으는 게임이에요. 멀리 갈수록 보물이 비싸지만, 비행선이 추락하면 아무것도 못 받아요. 새 여정이 시작될 때 누군가 <b>50점 이상</b>이면 게임이 끝나고, <b>점수가 가장 높은 사람</b>이 승리해요.'],
+  ['board','지도 보기','위에는 탐험가들(🂠 손패, 💎 보물), 가운데는 <b>섬 9개</b>예요. 멀리 있는 섬일수록 보물 점수가 높고, 섬 이름 옆 🎲는 그 섬으로 갈 때 굴리는 주사위 수예요. 아래는 내 카드, 오른쪽 위 🃏로 남은 카드를 셀 수 있어요.'],
+  ['roll','① 선장이 주사위 굴리기','<b>선장</b>이 다음 섬에 적힌 수만큼 주사위를 굴려요. 주사위에 나온 그림이 이번 구간의 <b>재난</b>이에요. 선장은 돌아가며 맡아요.'],
+  ['bluff','② 선장의 한마디','선장은 탑승객에게 <b>"가능합니다 / 불가능합니다"</b> 중 하나를 말해요. 진짜일 수도, <b>블러핑</b>일 수도 있어요! 오른쪽에 이번 재난 주사위가 보여요.'],
+  ['decide','③ 탈까, 내릴까','탑승객은 차례로 <b>탑승 유지</b> 또는 <b>내리기</b>를 골라요. 내리면 지금 섬의 보물 1장을 받고 이번 여정은 끝나요. 계속 타면 더 비싼 섬까지 갈 수 있지만, 추락하면 아무것도 못 받아요.'],
+  ['resolve','④ 재난 막기','선장은 재난마다 <b>같은 그림의 장비 카드</b>를 내서 막아요(🌫️ 나침반, ⚡ 피뢰침, 🐦 경적, 🏴‍☠️ 대포). 막을 수 있으면 <b>올라간다</b>, 비행선이 다음 섬으로 가요.'],
+  ['crash','추락!','막을 카드가 없으면 <b>추락</b>해요. 타고 있던 사람(선장 포함)은 이번 여정에서 아무것도 못 받아요. 여정이 끝나면 모두 다시 1번 섬에서 출발해요. 자세한 규칙은 게임의 <b>게임 방법 보기</b>에 있어요. 이제 직접 해 볼까요?']
+ ]}
+};
+const INFR=window.parent!==window;
+const q=new URLSearchParams(location.search),gid=q.get('g')||(location.hash||'').slice(1),GM=GAMES[gid];
+if(!GM)location.replace('index.html');
+let i=0;
+const $=id=>document.getElementById(id);
+document.documentElement.style.setProperty('--c1',GM.c1);document.documentElement.style.setProperty('--acc',GM.acc);
+$('ttl').textContent=GM.name+' 튜토리얼';
+const N=GM.slides.length;
+/* 효과음: 게임 선택 페이지의 효과음 설정을 따름 */
+let ac=null,sfxOn=true;try{sfxOn=JSON.parse(localStorage.getItem('pbg-hub-snd')||'{}').sfx!==false}catch(e){}
+function blip(up){
+  if(!sfxOn)return;try{
+    ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();
+    const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();o.type='sine';
+    o.frequency.setValueAtTime(up?660:520,t);o.frequency.exponentialRampToValueAtTime(up?990:390,t+.09);
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.12,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+.16);
+    o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+.2);
+  }catch(e){}
+}
+function show(n){
+  i=Math.max(0,Math.min(N-1,n));
+  const [k,h,t]=GM.slides[i];
+  const img=$('img');img.style.opacity=.3;img.onload=()=>img.style.opacity=1;img.src='tutorial/'+GM.key+'_'+k+'.webp';
+  if(i+1<N){const pre=new Image();pre.src='tutorial/'+GM.key+'_'+GM.slides[i+1][0]+'.webp'}
+  const rs=(RECTS[GM.key]||{})[k]||[];
+  $('ov').innerHTML=rs.length?`<defs><mask id="m"><rect width="100" height="100" fill="#fff"/>${rs.map(r=>`<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" rx="1.4" fill="#000"/>`).join('')}</mask></defs>
+    <rect width="100" height="100" fill="rgba(0,0,0,.42)" mask="url(#m)"/>${rs.map(r=>`<rect class="ring" x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" rx="1.4"/>`).join('')}`:'';
+  $('h').innerHTML=`<span class="no">${i+1}</span>${h}`;$('t').innerHTML=t;
+  $('cnt').textContent=(i+1)+' / '+N;$('bar').style.width=((i+1)/N*100)+'%';
+  $('nav').innerHTML=i<N-1
+    ?`<button class="prev" id="pv" ${i?'':'disabled'}>‹ 이전</button><button class="next" id="nx">다음 ›</button>`
+    :`<button class="prev" id="pv">‹ 이전</button>${INFR?'':`<a class="play" href="${GM.file}">바로 플레이</a>`}<a class="next" href="index.html">${INFR?'완료 · 로비로':'완료 · 게임 선택으로'}</a>`;
+  const pv=$('pv'),nx=$('nx');
+  if(pv)pv.onclick=()=>{blip(false);show(i-1)};
+  if(nx)nx.onclick=()=>{blip(true);show(i+1)};
+}
+$('phone').onclick=()=>{if(i<N-1){blip(true);show(i+1)}};
+let sx=null,sy=null;
+document.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY},{passive:true});
+document.addEventListener('touchend',e=>{if(sx==null)return;const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;sx=null;
+  if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)*1.3){if(dx<0&&i<N-1){blip(true);show(i+1)}else if(dx>0&&i>0){blip(false);show(i-1)}}},{passive:true});
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')show(i+1);if(e.key==='ArrowLeft')show(i-1)});
+show(0);
+</script>
+<script>
+if(window.parent!==window){document.addEventListener('click',function(e){var a=e.target.closest('a[href="index.html"]');if(a){e.preventDefault();parent.postMessage('pbg-close-tutorial','*')}},true);
+var t=document.querySelector('.top a');if(t)t.textContent='‹ 로비';}
+</script>
+</body>
+</html>

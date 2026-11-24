@@ -1219,7 +1219,7 @@ function hostOnClose(conn){
   if(O.phase==='lobby'&&e.pid&&!connectedPids().has(e.pid)){O.order=O.order.filter(p=>p!==e.pid);saveOnline()}
   broadcast();render();
 }
-async function hostCreate(){
+async function hostCreate(fixed){
   O.name=O.name.trim().slice(0,8);
   if(!O.name){O.err='이름을 입력해 주세요.';return render()}
   if(BUILD==='artifact'){Object.assign(O,{code:'',role:'host',pid:O.pid||rid(),phase:'lobby',order:[],names:{},lastN:{},seq:0,busy:false,conns:{},peer:null,err:''});saveOnline();return render()}
@@ -1227,8 +1227,8 @@ async function hostCreate(){
   if(!(await libReady())){O.busy=false;O.err=LIBFAIL;return render()}
   let peer=null,code='';
   for(let tries=0;tries<4&&!peer;tries++){
-    code=randCode();
-    try{peer=await openPeer(PEER_PREFIX+code)}catch(e){if(e&&e.type!=='unavailable-id')break}
+    code=fixed||randCode();
+    try{peer=await openPeer(PEER_PREFIX+code)}catch(e){if(e&&e.type!=='unavailable-id')break;if(fixed)await new Promise(r=>setTimeout(r,1500))}
   }
   if(!peer&&!(await mqttReady())){O.busy=false;O.err='연결 서버에 접속하지 못했어요. 잠시 후 다시 시도해 주세요.';return render()}
   Object.assign(O,{code,role:'host',pid:O.pid||rid(),phase:'lobby',order:[],names:{},lastN:{},seq:0,busy:false});
@@ -1831,6 +1831,14 @@ document.addEventListener('input',e=>{
     if(st&&st.code===O.hashCode){
       O.name=st.name||'';O.pid=st.pid;O.actN=st.actN||0;
       if(st.role==='host')hostResume(st);else guestJoin(O.hashCode);
+    }
+  }else if(BUILD==='web'){
+    /* 게임 선택 로비에서 함께 넘어온 경우: ?pbg=host|join&code=XXXX&name=… */
+    const q=new URLSearchParams(location.search),pb=q.get('pbg'),pc=(q.get('code')||'').toLowerCase();
+    if((pb==='host'||pb==='join')&&/^[a-z0-9]{4}$/.test(pc)){
+      MODE='online';O.name=(q.get('name')||'').trim().slice(0,8)||'손님';
+      try{history.replaceState(null,'',location.pathname+'#room-'+pc)}catch(e){}
+      if(pb==='host')hostCreate(pc);else guestJoin(pc);
     }
   }
   render();
