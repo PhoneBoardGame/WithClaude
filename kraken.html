@@ -135,6 +135,8 @@ input[type=text]{flex:1;min-width:0;background:rgba(0,0,0,.25);border:1px solid 
   background:repeating-linear-gradient(135deg,var(--card) 0 5px,#1b5580 5px 10px);border:1.5px solid var(--cardb);
   display:flex;align-items:center;justify-content:center;font-size:16px;transition:transform .2s,box-shadow .2s}
 .mc.can{cursor:pointer}
+.mc.pkable{cursor:pointer}
+.mc.peeked{outline:2px dashed #8fd3ff;outline-offset:1px;opacity:.88}
 .mc.up{background:#f3ead2;border-color:#d8c79a}
 .mc.up.K{background:#3a1f5c;border-color:var(--violet)}
 .mc.up.T{background:#fff4c9;border-color:var(--gold)}
@@ -1453,8 +1455,10 @@ const Sound = (() => {
   }
 
   // ---------- 렌더 ----------
+  const PEEK = new Set(); // 게임이 끝난 뒤 눌러서 확인한 카드
   function render() {
     if (!S) return;
+    if (S.phase !== 'over') PEEK.clear();
     let rh = '';
     for (let i = 1; i <= KR.MAX_ROUND; i++) rh += `<span class="rdot ${i < S.round ? 'done' : i === S.round ? 'now' : ''}"></span>`;
     $('#rounds').innerHTML = `<span style="margin-right:4px">R${S.round}</span>` + rh + (NET ? `<span class="roomtag">방 ${NET.code}</span>` : '');
@@ -1476,6 +1480,10 @@ const Sound = (() => {
         const can = myTurn && p.id !== ME && !h.up;
         const recBy = Object.entries(S.recs || {}).filter(([, r]) => r.pl === p.id && r.idx === idx).map(([k]) => +k === ME ? '나' : S.players[k].name);
         const lr = S.lastReveal && S.lastReveal.pl === p.id && S.lastReveal.idx === idx && S.lastReveal.fresh;
+        if (S.phase === 'over' && !h.up && h.c) {
+          const pk = PEEK.has(p.id + ':' + idx);
+          return `<div class="mc ${pk ? 'up ' + h.c + ' peeked' : 'pkable'}" data-pl="${p.id}" data-idx="${idx}">${pk ? ICON[h.c] : ''}</div>`;
+        }
         return `<div class="mc ${h.up ? 'up ' + h.c : ''} ${hov ? 'hov' : ''} ${can ? 'can' : ''} ${lr ? 'flip' : ''} ${recBy.length && !h.up ? 'rec' : ''}" data-pl="${p.id}" data-idx="${idx}">${h.up ? ICON[h.c] : ''}${recBy.length && !h.up ? `<span class="rtag">${recBy.join(',')}</span>` : ''}</div>`;
       }).join('');
       const isPicker = (S.phase === 'pick' || S.phase === 'roundEnd') && S.picker === p.id;
@@ -1658,6 +1666,11 @@ const Sound = (() => {
     if (nm) { openPlayer(+nm.dataset.name); return; }
     const c = e.target.closest('.mc'); if (!c) return;
     const t = { pl: +c.dataset.pl, idx: +c.dataset.idx };
+    if (S.phase === 'over') {
+      const h = S.players[t.pl] && S.players[t.pl].hand[t.idx];
+      if (h && !h.up && h.c) { const k = t.pl + ':' + t.idx; PEEK.has(k) ? PEEK.delete(k) : PEEK.add(k); Sound.play('tick'); render(); }
+      return;
+    }
     if (S.phase === 'pick' && S.picker !== ME) {
       if (S.players[t.pl].hand[t.idx].up) return;
       if (t.pl === S.picker) { toast('고민 중인 사람 자신의 카드는 추천할 수 없어요'); return; }
@@ -1763,13 +1776,21 @@ const Sound = (() => {
   }
 
   // ---------- 결과 ----------
+  function peekModal(d){ // 결과 창을 잠깐 내리고 판 보기
+    d.style.display='none';
+    const b=document.createElement('button');b.className='peekback';b.textContent='🏆 결과 다시 보기';
+    b.style.cssText='position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:9999;padding:13px 20px;border-radius:99px;border:0;font:inherit;font-weight:800;font-size:15px;background:#ffd35a;color:#2a1d00;box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:pointer';
+    b.onclick=()=>{b.remove();if(d.isConnected)d.style.display=''};
+    document.body.appendChild(b);
+    const w=setInterval(()=>{if(!d.isConnected){b.remove();clearInterval(w)}else if(!b.isConnected)clearInterval(w)},500);
+  }
   function showResult() {
     Sound.bgm(false); stopTimer();
     if (isHost()) { pushState(); ev('over'); }
     const meWin = S.players[ME].role === S.winner;
     Sound.play(meWin ? 'win' : 'lose'); Sound.vib(meWin ? [80, 50, 80, 50, 200] : [300]);
     const why = { kraken: '크라켄이 깨어났어요!', treasure: '보물 상자를 모두 찾았어요!', time: '4라운드 동안 보물을 다 찾지 못했어요.' }[S.reason];
-    banner(`게임 종료 — ${ROLE[S.winner].n} 승리`);
+    banner(`게임 종료 — ${ROLE[S.winner].n} 승리 · 뒤집힌 카드를 누르면 확인`);
     const btns = isClient()
       ? `<p style="font-size:12.5px;color:var(--mute);margin:0 0 4px">방장이 다시 시작하면 자동으로 이어져요.</p><div class="btns"><button class="big ghost" data-a="home">방에서 나가기</button></div>`
       : isHost()
@@ -1780,10 +1801,11 @@ const Sound = (() => {
       <h1>${ROLE[S.winner].n} 승리!</h1><p style="color:var(--mute);margin:0">${why}</p>
       <p style="font-size:16px;font-weight:800;margin:12px 0 0;color:${meWin ? 'var(--gold2)' : 'var(--red)'}">${meWin ? '🎉 당신의 팀이 이겼어요!' : '😵 당신의 팀이 졌어요'}</p>
       <div class="plist">${S.players.map(p => `<div>${p.name}${p.id === ME ? ' (나)' : ''}<span class="rchip ${p.role}">${ROLE[p.role].n}</span></div>`).join('')}</div>
-      ${btns}</div>`;
+      ${btns}<button class="big ghost" data-a="peek" style="width:100%;margin-top:8px">🗺️ 판 보기</button></div>`;
     d.onclick = e => {
       const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
       Sound.play('confirm');
+      if (a === 'peek') { peekModal(d); return; }
       if (a === 'again') { d.remove(); startGame(); }
       else if (a === 'lobby') {
         d.remove(); gid++; S = null; stopTimer(); clearLayer(); Sound.bgm(false);

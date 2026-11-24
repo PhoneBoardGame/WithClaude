@@ -2498,7 +2498,9 @@ function showPlayer(i){
     <p style="text-align:center">${G.captain===i?'🎖 현재 선장 · ':''}${p.status==='on'?'탑승 중':'하차'} · 손패 ${p.hand.length}장 · 보물 ${p.tr.length}장</p>
     ${G.exp&&p.color?`<p class="muted" style="text-align:center">캐릭터: ${CHAR[p.color].name} ${p.charUsed?'(사용함)':'(미사용)'}</p>`:''}
     ${trCountTable(p)}
-    ${reveal?`<h3>[테스트] 손패</h3><div class="cards">${p.hand.map(c=>cardHtml(c)).join('')}</div><p class="muted">[테스트] 점수 ${score(p)}점</p>`:''}`);
+    ${reveal?`<h3>[테스트] 손패</h3><div class="cards">${p.hand.map(c=>cardHtml(c)).join('')}</div><p class="muted">[테스트] 점수 ${score(p)}점</p>`:''}
+    ${G.phase==='end'?`<p class="muted" style="text-align:center">게임이 끝나서 숨겨진 카드를 공개해요</p><h3>손패 ${p.hand.length}장</h3><div class="cards">${p.hand.map(c=>cardHtml(c)).join('')||'<p class="muted">없음</p>'}</div>
+    <h3>보물 ${p.tr.length}장 · ${score(p)}점</h3><div class="cards">${p.tr.map(c=>`<span class="card"><span class="tag">${c.city+1}섬</span><span class="ci">${c.t==='spy'?'🔭':'💎'}</span>${c.t==='spy'?'망원경(2점)':c.v+'점'}</span>`).join('')||'<p class="muted">없음</p>'}</div>`:''}`);
 }
 function showHandView(){
   const p=P(G.me);
@@ -2577,13 +2579,22 @@ function confirmBox(msg,yes){
   m.querySelector('#cn').onclick=()=>m.remove();m.querySelector('#cy').onclick=()=>{m.remove();yes()};
 }
 let endModal=null;
+function peekModal(d){ // 결과 창을 잠깐 내리고 판 보기
+  d.style.display='none';
+  const b=document.createElement('button');b.className='peekback';b.textContent='🏆 결과 다시 보기';
+  b.style.cssText='position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:9999;padding:13px 20px;border-radius:99px;border:0;font:inherit;font-weight:800;font-size:15px;background:#ffd35a;color:#2a1d00;box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:pointer';
+  b.onclick=()=>{b.remove();if(d.isConnected)d.style.display=''};
+  document.body.appendChild(b);
+  const w=setInterval(()=>{if(!d.isConnected){b.remove();clearInterval(w)}else if(!b.isConnected)clearInterval(w)},500);
+}
 function showEnd(){
   if(NET.role!=='client'){G.phase='end';render();}
   sfx('win');
   const res=G.players.map((p,i)=>{const help=p.hand.filter(c=>c.t==='help').length;return {p,i,base:score(p),help,total:score(p)-2*help}}).sort((a,b)=>b.total-a.total);
   const m=openModal(`<h2>🏆 게임 종료</h2>
     ${res.map((r,k)=>`<div class="rank"><b style="width:22px">${k+1}</b>${portrait(r.p.color,38)}<div><b>${esc(r.p.name)}</b><div class="muted">보물 ${r.p.tr.length}장${r.help?` · 작은 도움 ${r.help}장 −${r.help*2}`:''}</div></div><span class="sc">${r.total}</span></div>`).join('')}
-    ${NET.role==='client'?'<p class="muted" style="text-align:center">방장이 다음 판을 고르는 중…</p><div class="mbtns"><button id="eClose">닫기</button><button id="eLeave">나가기</button></div>':'<div class="mbtns"><button id="eRoom">방으로</button><button class="primary" id="eAgain">한 판 더</button></div>'}`,{closable:false});
+    ${NET.role==='client'?'<p class="muted" style="text-align:center">방장이 다음 판을 고르는 중…</p><div class="mbtns"><button id="eClose">닫기</button><button id="eLeave">나가기</button></div>':'<div class="mbtns"><button id="eRoom">방으로</button><button class="primary" id="eAgain">한 판 더</button></div>'}<div class="mbtns"><button id="ePeek">🗺️ 판 보기</button></div>`,{closable:false});
+  m.querySelector('#ePeek').onclick=()=>peekModal(m);
   endModal=m;
   if(NET.role==='client'){m.querySelector('#eClose').onclick=()=>m.remove();m.querySelector('#eLeave').onclick=()=>clientLeave();}
   else{m.querySelector('#eRoom').onclick=()=>exitGame(true);m.querySelector('#eAgain').onclick=()=>startGame();}

@@ -86,6 +86,8 @@ input[type=text]{flex:1;min-width:0;background:rgba(0,0,0,.25);border:1px solid 
 .pc .cnt{font-size:12px;font-weight:900;margin-left:4px}
 .pstrip.many .pc .pn{font-size:11px}
 .pstrip.many .mtk{width:11px;height:15px}
+.mtk.pk{background:#f3ead2;color:#2a1a0a;font-size:10px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;border-style:dashed}
+.pc.pkable{cursor:pointer}
 .mtk{width:13px;height:18px;border-radius:3px;background:repeating-linear-gradient(135deg,#7a2a2a 0 3px,#5a1a1a 3px 6px);border:1px solid #c98a6a}
 .mac{position:relative;width:21px;height:18px}
 .mac i{position:absolute;top:0;width:13px;height:18px;border-radius:3px;background:#2f5d8a;border:1px solid #8fc0ea}
@@ -949,16 +951,25 @@ const Sound = (() => {
     else t = `${Math.min(S.turnNo + 1, S.hand * S.n)}/${S.hand * S.n} · ${Math.floor(S.turnNo / S.n) + 1}바퀴`;
     $('#turnInfo').textContent = t;
   }
+  const DPEEK = new Set(); // 경주가 끝난 뒤 눌러서 확인한 마권
   function renderStrip() {
+    if (S.phase !== 'over') DPEEK.clear();
+    const over = S.phase === 'over';
     const cur = (S.phase === 'setup' || S.phase === 'play' || S.phase === 'swap') ? S.turn : -1;
     const ps = $('#pstrip');
     ps.style.gridTemplateColumns = `repeat(${S.n}, minmax(0, 1fr))`;
     ps.classList.toggle('many', S.n >= 5);
-    ps.innerHTML = S.players.map(p => `<div class="pc ${p.id === ME ? 'me' : ''} ${p.id === cur ? 'cur' : ''}" data-pid="${p.id}">
+    ps.innerHTML = S.players.map(p => `<div class="pc ${p.id === ME ? 'me' : ''} ${p.id === cur ? 'cur' : ''} ${over ? 'pkable' : ''}" data-pid="${p.id}">
       <div class="pn">${p.name}${p.id === ME ? '(나)' : ''}${S.phase === 'ready' && p.ready ? ' ✓' : ''}</div>
-      <div class="prow">${p.tickets.map(() => '<span class="mtk"></span>').join('')}${p.token ? '<span class="tok">🐴</span>' : ''}</div>
+      <div class="prow">${p.tickets.map(h => over && DPEEK.has(p.id) && h ? `<span class="mtk pk">${h}</span>` : '<span class="mtk"></span>').join('')}${p.token ? '<span class="tok">🐴</span>' : ''}</div>
       <div class="prow"><span class="mac"><i></i><i></i><i></i></span><b class="cnt">${p.hand.length}</b></div></div>`).join('');
   }
+  document.addEventListener('click', e => {
+    if (!S || S.phase !== 'over') return;
+    const c = e.target.closest('#pstrip .pc'); if (!c) return;
+    const pid = +c.dataset.pid; DPEEK.has(pid) ? DPEEK.delete(pid) : DPEEK.add(pid);
+    Sound.play('tap'); renderStrip();
+  });
   function boardGeom() {
     const b = $('#board'), W = b.clientWidth, H = b.clientHeight;
     const cw = Math.max(34, Math.min(56, Math.floor((W - 16 - 6 * 5) / 7)));
@@ -2011,15 +2022,24 @@ const Sound = (() => {
       : isHost() ? `<div class="btns"><button class="big ghost" data-a="lobby">대기실로</button><button class="big" data-a="again">다시 하기</button></div>`
       : `<div class="btns"><button class="big ghost" data-a="home">처음으로</button><button class="big" data-a="again">다시 하기</button></div>`;
     d.querySelector('#fend').innerHTML = `<div style="font-size:22px;font-weight:900;margin:10px 0 2px;color:var(--gold2)">🏆 ${winners.map(p => p.name).join(', ')} 우승! (${mx}점)</div>
-      <div style="font-size:14px;color:${meWin ? 'var(--gold2)' : 'var(--mute)'}">${meWin ? '🎉 축하해요!' : '아쉬워요, 다음 경주에서!'}</div>${btns}`;
+      <div style="font-size:14px;color:${meWin ? 'var(--gold2)' : 'var(--mute)'}">${meWin ? '🎉 축하해요!' : '아쉬워요, 다음 경주에서!'}</div>${btns}<button class="big ghost" data-a="peek" style="width:100%;margin-top:8px">🗺️ 판 보기</button>`;
     d.querySelector('#fend').onclick = e => {
       const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
       Sound.play('confirm');
+      if (a === 'peek') { peekModal(d); return; }
       if (a === 'again') { d.remove(); startGame(); }
       else if (a === 'lobby') { d.remove(); gid++; S = null; stopTimer(); layer.innerHTML = ''; Sound.bgm(false); NET.inGame = false; NET.seats = NET.seats.filter(s => s.kind !== 'remote' || s.connected); showLobby(); bcLobby(); }
       else if (a === 'leave') leaveGame();
       else { d.remove(); goHome(); }
     };
+  }
+  function peekModal(d){ // 결과 창을 잠깐 내리고 판 보기
+    d.style.display='none';
+    const b=document.createElement('button');b.className='peekback';b.textContent='🏆 결과 다시 보기';
+    b.style.cssText='position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:9999;padding:13px 20px;border-radius:99px;border:0;font:inherit;font-weight:800;font-size:15px;background:#ffd35a;color:#2a1d00;box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:pointer';
+    b.onclick=()=>{b.remove();if(d.isConnected)d.style.display=''};
+    document.body.appendChild(b);
+    const w=setInterval(()=>{if(!d.isConnected){b.remove();clearInterval(w)}else if(!b.isConnected)clearInterval(w)},500);
   }
 })();
 
