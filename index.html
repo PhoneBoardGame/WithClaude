@@ -118,6 +118,27 @@ footer{text-align:center;color:var(--mute);font-size:11.5px;margin-top:18px}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;background:rgba(10,20,35,.95);color:#fff;padding:11px 16px;border-radius:12px;font-size:13.5px;font-weight:700;box-shadow:0 8px 20px rgba(0,0,0,.4);max-width:90%;text-align:center;animation:fade .2s}
 .tutfr{position:fixed;inset:0;z-index:55;background:#06121f}
 .tutfr iframe{width:100%;height:100%;border:0;display:block}
+/* ---------- 보기 방식: 리스트 / 요약 ---------- */
+.viewbar{display:flex;align-items:center;justify-content:space-between;margin:0 2px 10px}
+.viewbar .cnt{font-size:12.5px;font-weight:700;color:var(--mute)}
+.seg{display:flex;padding:3px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid var(--line)}
+.seg button{font:inherit;font-size:12.5px;font-weight:800;padding:6px 11px;border:0;border-radius:9px;background:transparent;color:var(--mute);cursor:pointer}
+.seg button.on{background:#fff;color:#14233a}
+.game .reqs .s{display:none}
+.list.grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.list.grid.inroom{gap:14px 9px}
+.list.grid .game{flex-direction:column;align-items:stretch;gap:7px;padding:11px 7px 8px;border-radius:16px}
+.list.grid .game .main{flex-direction:column;gap:5px}
+.list.grid .game .ic{flex:0 0 auto;width:42px;height:42px;border-radius:12px;font-size:24px}
+.list.grid .game .tx{width:100%;text-align:center}
+.list.grid .game b{font-size:13px;letter-spacing:-.6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list.grid .game .desc,.list.grid .game .meta,.list.grid .game .tut{display:none}
+.list.grid .game .acts{flex-direction:row;gap:4px}
+.list.grid .game .acts>*{flex:1;min-width:0;padding:6px 2px;font-size:11.5px;border-radius:9px;white-space:nowrap}
+.list.grid .game .reqs{left:auto;right:-4px;top:-7px;bottom:auto}
+.list.grid .game .reqs .l,.list.grid .game .req .e{display:none}
+.list.grid .game .reqs .s{display:inline}
+.list.grid .game .reqs span{font-size:10.5px;padding:2px 6px}
 </style>
 </head>
 <body>
@@ -131,6 +152,7 @@ footer{text-align:center;color:var(--mute);font-size:11.5px;margin-top:18px}
   <div class="hint-snd" id="sndHint">화면을 한 번 누르면 음악이 시작돼요</div>
   <section id="lobby"></section>
 
+  <div class="viewbar"><span class="cnt" id="gcnt"></span><div class="seg" role="group" aria-label="게임 목록 보기 방식"><button data-v="list">☰ 리스트</button><button data-v="grid">▦ 요약</button></div></div>
   <nav class="list">
     <div class="game kraken" data-game="kraken">
       <a class="main" href="kraken.html">
@@ -1706,12 +1728,12 @@ return {QRCode:req("index"),ECL:req("QRErrorCorrectLevel")};})();
       if(!inRoom)h='<a class="go" href="'+G.file+'" data-a="play" data-g="'+g+'">플레이</a>';
       else{
         if(L.role==='host')h+='<button class="go" data-a="play" data-g="'+g+'">플레이</button>';
-        h+='<button class="req'+(mine?' on':'')+'" data-a="req" data-g="'+g+'">'+(mine?'🙋 요청함':'요청')+'</button>';
+        h+='<button class="req'+(mine?' on':'')+'" data-a="req" data-g="'+g+'">'+(mine?'<span class="e">🙋 </span>요청함':'요청')+'</button>';
       }
       h+='<a class="tut" href="tutorial.html#'+g+'" data-a="tut" data-g="'+g+'">튜토리얼</a>';
       setH(acts,h);
       var who=inRoom?L.members.filter(function(m){return (m.req||[]).indexOf(g)>=0}).map(function(m){return m.name}):[];
-      reqs.classList.toggle('on',who.length>0);setH(reqs,who.length?'<span>🙋 '+who.length+'명 · '+esc(who.join(', '))+'</span>':'');
+      reqs.classList.toggle('on',who.length>0);setH(reqs,who.length?'<span class="l">🙋 '+who.length+'명 · '+esc(who.join(', '))+'</span><span class="s" title="'+esc(who.join(', '))+'">🙋'+who.length+'</span>':'');
       card.querySelector('.main').setAttribute('data-a','main');card.querySelector('.main').setAttribute('data-g',g);
     });
   }
@@ -1748,6 +1770,21 @@ return {QRCode:req("index"),ECL:req("QRErrorCorrectLevel")};})();
   }
   window.addEventListener('pageshow',function(e){if(e.persisted&&L.role&&!L.mq)boot()});
   boot();
+})();
+</script>
+<script>
+/* 게임 목록 보기 방식(리스트/요약) — 휴대폰에 기억 */
+(function(){
+  var K='pbg-view',list=document.querySelector('.list'),btns=document.querySelectorAll('.seg button');
+  var n=list.querySelectorAll('.game').length;document.getElementById('gcnt').textContent='게임 '+n+'개';
+  /* 요약 보기에서 긴 게임 이름은 글자를 줄여서 되도록 한 줄에 */
+  function fit(){list.querySelectorAll('.game b').forEach(function(b){b.style.fontSize='';
+    if(!list.classList.contains('grid'))return;for(var f=13;f>9.5&&b.scrollWidth>b.clientWidth;f-=.5)b.style.fontSize=f+'px'})}
+  window.addEventListener('resize',fit);window.pbgFitNames=fit;
+  function set(v,save){list.classList.toggle('grid',v==='grid');setTimeout(fit,0);btns.forEach(function(b){b.classList.toggle('on',b.dataset.v===v)});if(save)try{localStorage.setItem(K,v)}catch(e){}}
+  var v='list';try{v=localStorage.getItem(K)||'list'}catch(e){}
+  set(v);
+  btns.forEach(function(b){b.addEventListener('click',function(){set(b.dataset.v,true);try{HubSound.sfx('on')}catch(e){}})});
 })();
 </script>
 </body>
