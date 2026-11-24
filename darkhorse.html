@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>다크호스</title>
 <style>
+.hubback{align-self:flex-start;width:auto;display:inline-flex;align-items:center;gap:4px;padding:7px 13px;border-radius:99px;background:rgba(127,127,127,.18);border:1px solid rgba(127,127,127,.35);color:inherit;text-decoration:none;font-size:13px;font-weight:800;margin:0 0 4px;position:relative;z-index:2}
+
 :root{
   --bg1:#0b1d12; --bg2:#123323; --ink:#f1f6ee; --mute:#9fb8a3; --gold:#f5c542; --gold2:#ffdf7a; --red:#ff5a6e;
   --sky1:#7cc8ff; --sky2:#d6f0ff; --grass1:#69c04c; --grass2:#3f8f2f;
@@ -255,11 +257,19 @@ input[type=text]{flex:1;min-width:0;background:rgba(0,0,0,.25);border:1px solid 
 .bigcard .who{margin-top:10px;font-size:14px;font-weight:700;text-shadow:0 2px 6px #000}
 .toast{position:fixed;left:50%;bottom:180px;transform:translateX(-50%);background:#000d;padding:10px 16px;border-radius:99px;font-size:13px;z-index:60;animation:fade .2s;white-space:nowrap}
 </style>
+<script>
+/* 휴대폰 뒤로 가기를 누르면 게임 목록(로비)으로: 게임 주소로 바로 들어온 경우에도 */
+(function(){var HUB='index.html';
+  try{var _r=document.referrer,_fh=_r.indexOf(location.origin+'/')===0&&/\/(index\.html)?$/.test(_r.split(/[?#]/)[0]);if(!_fh&&!(history.state&&history.state.pbgHub)){var here=location.href;history.replaceState({pbgHub:1},'',HUB);history.pushState(null,'',here)}}catch(e){}
+  addEventListener('popstate',function(e){if(e.state&&e.state.pbgHub)location.replace(HUB)});
+})();
+</script>
 </head>
 <body>
 
 <!-- 시작 화면 -->
 <section id="start">
+  <a class="hubback" href="index.html">‹ 게임 목록</a>
   <div class="logo"><span class="hs">🏇</span><h1>다크호스</h1><p>마권을 몰래 쥐고, 경주를 뒤집어라!</p></div>
   <div class="panel">
     <h3>게임 방식</h3>
@@ -286,6 +296,7 @@ input[type=text]{flex:1;min-width:0;background:rgba(0,0,0,.25);border:1px solid 
 
 <!-- QR로 들어온 사람 전용 입장 화면 -->
 <section id="joinScreen" class="hidden scr">
+  <a class="hubback" href="index.html">‹ 게임 목록</a>
   <div class="logo"><span class="hs">🏇</span><h1>다크호스</h1><p>초대받은 경주에 입장해요</p></div>
   <div class="panel" style="text-align:center">
     <div class="rcode">방 코드 <b id="jCode">----</b></div>
@@ -299,6 +310,7 @@ input[type=text]{flex:1;min-width:0;background:rgba(0,0,0,.25);border:1px solid 
 
 <!-- 대기실 -->
 <section id="lobby" class="hidden scr">
+  <a class="hubback" href="index.html">‹ 게임 목록</a>
   <div class="logo" style="margin:4px 0 0"><h1 style="font-size:22px">🏇 대기실</h1></div>
   <div class="panel" id="hostBox" style="text-align:center">
     <h3>QR을 찍어 입장하세요</h3>
@@ -865,6 +877,7 @@ const Sound = (() => {
       <div class="mrow"><span>⏱ 타이머 표시</span><div class="seg"><button data-ts="clock" class="${Sound.st.timerStyle === 'clock' ? 'on' : ''}">초시계</button><button data-ts="bar" class="${Sound.st.timerStyle === 'bar' ? 'on' : ''}">막대</button></div></div>
       <div class="mrow" data-a="tut" style="cursor:pointer"><span>🎓 튜토리얼 보기</span><span>›</span></div>
       <div class="mrow" data-a="rules" style="cursor:pointer"><span>📖 규칙 보기</span><span>›</span></div>
+      <div class="mrow" data-a="hub" style="cursor:pointer"><span>🏠 게임 목록(로비)으로</span><span>›</span></div>
       <div class="mrow" data-a="quit" style="cursor:pointer;color:var(--red)"><span>🚪 방 나가기</span><span>›</span></div>
       <button class="big ghost" data-a="close">닫기</button>`, 'dim', 'sheet');
     d.onclick = e => {
@@ -874,6 +887,7 @@ const Sound = (() => {
       const tg = e.target.closest('[data-k]');
       if (tg) { const k = tg.dataset.k, on = Sound.toggle(k); tg.classList.toggle('on', on); if (k === 'bgm') Sound.bgm(true); if (k === 'sfx') Sound.play('tap'); if (k === 'vib') Sound.vib(40); return; }
       if (e.target.closest('[data-a=quit]')) { d.remove(); leaveGame(); }
+      if (e.target.closest('[data-a=hub]')) { d.remove(); confirmBox('게임 목록으로 갈까요?' + (isHost() ? '<br><small style="color:var(--mute)">방장이 나가면 방이 닫혀요.</small>' : ''), '게임 목록으로', () => { try { goHome(); } catch (e) {} location.href = 'index.html'; }); }
       if (e.target.closest('[data-a=tut]')) { d.remove(); openTutorial(); }
       if (e.target.closest('[data-a=rules]')) { d.remove(); $('#rulesBtn').click(); }
     };

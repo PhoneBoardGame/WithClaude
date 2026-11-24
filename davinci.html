@@ -15,6 +15,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 #app{height:100%;max-width:520px;margin:0 auto;position:relative}
 
 /* ---------- 설정 화면 ---------- */
+.hubback{align-self:flex-start;width:auto;display:inline-flex;align-items:center;gap:4px;padding:7px 13px;border-radius:99px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:inherit;text-decoration:none;font-size:13px;font-weight:800;margin:0 0 4px}
 .setup{height:100%;overflow:auto;padding:calc(18px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}
 .logo{text-align:center;margin:8px 0 16px}
 .logo .tiles{display:flex;justify-content:center;gap:5px;margin-bottom:10px}
@@ -453,7 +454,7 @@ function renderSetup(){
 function _renderSetup(){
   const n=1+CFG.ais.length;
   const logoT=[['b',3,-8],['w',5,-3],['b','J',2],['w',9,6],['b',11,10]].map(([c,v,r])=>'<div class="t '+c+(v==='J'?' joker':'')+'" style="--r:'+r+'deg">'+numHTML(v)+'</div>').join('');
-  $('#app').innerHTML=`<div class="setup">
+  $('#app').innerHTML=`<div class="setup">${HUBLINK()}
   <div class="logo"><div class="tiles">${logoT}</div><h1>다빈치 코드</h1><p>숨겨진 숫자를 추리해서 상대의 코드를 모두 깨뜨리세요</p></div>
   <div class="card"><h3>참가자 <small>${n}명 · 2~4명</small></h3>
     <div class="prow"><span class="av">🙂</span><input id="myname" maxlength="8" value="${esc(CFG.name)}" placeholder="내 이름"><span class="tag">나</span></div>
@@ -603,6 +604,7 @@ function drawSheet(){
   }else if(k==='menu'){
     h=`<div class="sheet menu"><h2>메뉴</h2><p class="sh-sub">카운팅 ${G.opts.count?'켜짐':'꺼짐'} · 조커 ${G.opts.joker?'있음':'없음'} · 시간 제한 ${G.opts.tl?G.opts.tl+'초':'없음'}</p>
       <button data-a="rules">📜 규칙 보기</button><button data-a="bgm">${CFG.bgm?'🎵 배경음악 끄기':'🎵 배경음악 켜기'}</button>
+      ${BUILD==='web'?`<button data-a="tohub">🏠 게임 목록(로비)으로${NET&&NET.role==='host'?' <small style="color:var(--mute);font-weight:600">· 방장이 나가면 방이 닫혀요</small>':''}</button>`:''}
       ${!NET?'<button data-a="restart">🔄 같은 설정으로 새 게임</button><button data-a="quit">🚪 방 설정으로 나가기</button>':
         NET.role==='host'?'<button data-a="restart">🔄 같은 멤버로 새 게임</button><button data-a="toroom">🚪 모두 대기실로</button>':'<button data-a="leave">🚪 방에서 나가기</button>'}
       <button data-a="sheetx" style="text-align:center">닫기</button></div>`;
@@ -723,6 +725,7 @@ document.addEventListener('click',e=>{
   case 'result':openSheet('end');break;
   case 'poolview':openSheet('pool');break;
   case 'menu':openSheet('menu');break;
+  case 'tohub':location.href='index.html';break;
   case 'count':openSheet('count');break;
   case 'help':CFG.help=!CFG.help;saveCfg();render();break;
   case 'snd':CFG.sfx=!CFG.sfx;saveCfg();render();break;
@@ -764,6 +767,9 @@ window.addEventListener('resize',()=>{if(G)render()});
    주제: pbg-davinci-v1/CODE/in (참가자→방장), /to/<pid> (방장→참가자), /all (방 닫힘) */
 const NETP='pbg-davinci-v1/';
 const BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
+const HUBLINK=()=>BUILD==='web'?'<a class="hubback" href="index.html">‹ 게임 목록</a>':'';
+if(BUILD==='web'){try{var _r=document.referrer,_fh=_r.indexOf(location.origin+'/')===0&&/\/(index\.html)?$/.test(_r.split(/[?#]/)[0]);if(!_fh&&!(history.state&&history.state.pbgHub)){const here=location.href;history.replaceState({pbgHub:1},'','index.html');history.pushState(null,'',here)}}catch(e){}
+  addEventListener('popstate',e=>{if(e.state&&e.state.pbgHub)location.replace('index.html')})}
 const MULTI_URL='https://phoneboardgame.github.io/WithClaude/davinci.html';
 const rid=n=>{const a='abcdefghijkmnpqrstuvwxyz23456789';let s='';for(let i=0;i<(n||10);i++)s+=a[Math.floor(Math.random()*a.length)];return s};
 const code4=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZ';let s='';for(let i=0;i<4;i++)s+=a[Math.floor(Math.random()*a.length)];return s};
@@ -961,13 +967,13 @@ function renderRoom(){
     <button class="sub" data-a="rules">📜 규칙 보기</button>
     <button class="sub" data-a="leave">${host?'방 닫기':'방에서 나가기'}</button>`;
   }
-  $('#app').innerHTML=`<div class="setup"><div class="logo" style="margin-bottom:10px"><h1 style="font-size:24px">다빈치 코드 · 대기실</h1><p>${host?'나는 방장이에요. 설정과 시작은 방장만 할 수 있어요.':'참가자로 들어왔어요.'}</p></div>
+  $('#app').innerHTML=`<div class="setup">${HUBLINK()}<div class="logo" style="margin-bottom:10px"><h1 style="font-size:24px">다빈치 코드 · 대기실</h1><p>${host?'나는 방장이에요. 설정과 시작은 방장만 할 수 있어요.':'참가자로 들어왔어요.'}</p></div>
     ${NET.status&&R?`<div class="card" style="color:#ffb4b4;font-size:13px;text-align:center">${esc(NET.status)}</div>`:''}${body}</div>`;
   const nw=document.querySelector('.setup');if(nw&&keep)nw.scrollTop=keep;
 }
 /* 참가 이름 받기 */
 function renderJoin(code){
-  $('#app').innerHTML=`<div class="setup"><div class="logo"><h1>다빈치 코드</h1><p>방 <b style="color:var(--gold)">${esc(code)}</b>에 들어가요</p></div>
+  $('#app').innerHTML=`<div class="setup">${HUBLINK()}<div class="logo"><h1>다빈치 코드</h1><p>방 <b style="color:var(--gold)">${esc(code)}</b>에 들어가요</p></div>
     <div class="card"><h3>내 이름</h3><div class="prow"><span class="av">🙂</span><input id="jname" maxlength="8" placeholder="친구들에게 보일 이름" value="${esc(CFG.name==='나'?'':CFG.name)}"></div></div>
     <button class="big" data-a="joingo" data-code="${esc(code)}">입장하기</button>
     <button class="sub" data-a="joinx">처음으로</button></div>`;

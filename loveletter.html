@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#2a1018">
 <title>러브레터</title>
 <style>
+.hubback{align-self:flex-start;width:auto;display:inline-flex;align-items:center;gap:4px;padding:7px 13px;border-radius:99px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:inherit;text-decoration:none;font-size:13px;font-weight:800;margin:0 0 4px}
 :root{--bg:#2a1018;--paper:#f7efe0;--paper2:#eadcc1;--ink:#2b1a14;--muted:#7a6656;--gold:#d4ad55;--rose:#b73a52;--line:#d9c8a8}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;min-height:100%}
@@ -328,6 +329,10 @@ table.ref .cname{font-weight:700;white-space:nowrap}
 <div id="app"></div>
 <script>
 const BUILD='web'; // 'web'(GitHub) | 'artifact'(claude.ai)
+/* 휴대폰 뒤로 가기를 누르면 게임 목록(로비)으로: 게임 주소로 바로 들어온 경우에도 */
+if(BUILD==='web'){try{var _r=document.referrer,_fh=_r.indexOf(location.origin+'/')===0&&/\/(index\.html)?$/.test(_r.split(/[?#]/)[0]);if(!_fh&&!(history.state&&history.state.pbgHub)){const here=location.href;history.replaceState({pbgHub:1},'','index.html');history.pushState(null,'',here)}}catch(e){}
+  addEventListener('popstate',e=>{if(e.state&&e.state.pbgHub)location.replace('index.html')})}
+const HUBLINK=()=>BUILD==='web'?'<a class="hubback" href="index.html">‹ 게임 목록</a>':'';
 const MULTI_URL='https://phoneboardgame.github.io/WithClaude/loveletter.html';
 const KEY='loveletter-pnp-v1', OKEY='loveletter-peer-v1', SKEY='loveletter-solo-v1';
 const NET=()=>MODE==='online'||MODE==='solo';
@@ -986,7 +991,7 @@ function renderGameEnd(){
 /* ---------- mode select & local views ---------- */
 function loadSolo(){try{const s=localStorage.getItem(SKEY);return s?JSON.parse(s):null}catch(e){return null}}
 function renderModeSelect(){
-  return `<div class="hero"><div class="seal">💌</div><h1 class="serif">러브레터</h1></div>
+  return `${HUBLINK()}<div class="hero"><div class="seal">💌</div><h1 class="serif">러브레터</h1></div>
   <button class="mode" data-a="mode" data-v="local"><span class="mi">📱</span><b>휴대폰 1대 모드</b><small>한 대를 돌려 가며 플레이</small></button>
   <button class="mode" data-a="mode" data-v="online"><span class="mi">📱📱</span><b>각자 휴대폰 모드</b><small>${BUILD==='artifact'?'방을 만들고 AI 플레이어로 채워서 플레이':'QR 코드로 방에 들어와 각자 플레이 · AI 추가 가능'}</small></button>
   <button class="btn ghost" data-a="grules">게임 규칙 보기</button>
@@ -1599,7 +1604,7 @@ function soloStart(){
 }
 function renderOnline(){
   if(O.phase==='menu')return renderOnlineMenu();
-  if(O.phase==='lobby'||!G)return renderLobby();
+  if(O.phase==='lobby'||!G)return HUBLINK()+renderLobby();
   return renderTable();
 }
 
@@ -1663,6 +1668,7 @@ function renderSheet(){
       c=`<h2>메뉴</h2>
       <button class="btn ghost" style="color:var(--ink);border-color:var(--line)" data-a="grules">게임 규칙 보기</button>
       <button class="btn ghost" style="color:var(--ink);border-color:var(--line)" data-a="rules">카드 설명 보기</button>
+      ${BUILD==='web'?`<button class="btn ghost" style="color:var(--ink);border-color:var(--line)" data-a="tohub">🏠 게임 목록(로비)으로${MODE==='online'&&O.role==='host'?'<br><small>방장이 나가면 방이 닫혀요</small>':''}</button>`:''}
       ${MODE==='solo'?`<button class="btn rose" data-a="home">게임 끝내고 처음으로</button><p class="hint" style="color:var(--muted)">진행 상황이 지워집니다.</p>`
         :MODE==='online'?`<button class="btn rose" data-a="home">방 나가기</button><p class="hint" style="color:var(--muted)">${O.role==='host'?'방장이 나가면 게임이 끝나요. (새로고침은 괜찮아요 — 같은 주소로 다시 열면 이어져요)':'다시 QR을 찍으면 같은 자리로 돌아올 수 있어요.'}</p>`
         :`<button class="btn rose" data-a="home">게임 끝내고 처음으로</button><p class="hint" style="color:var(--muted)">게임을 끝내면 진행 상황이 지워집니다.</p>`}`;
@@ -1756,6 +1762,7 @@ function act(a,v){
     case 'unpeek':UI.peekEnd=false;scrollTo(0,0);break;
     case 'info':UI.sheet='info';break;
     case 'menu':UI.sheet='menu';break;
+    case 'tohub':location.href='index.html';return;
     case 'olog':UI.sheet='log';break;
     case 'spyinfo':UI.sheet='spy';break;
     case 'soundset':UI.sheet='sound';break;
